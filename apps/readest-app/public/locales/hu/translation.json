@@ -2460,5 +2460,7 @@
   "Dialogue Highlighting": "Párbeszédkiemelés",
   "Background": "Háttér",
   "Follows the theme color": "Követi a téma színét",
-  "Background Style": "Háttérstílus"
+  "Background Style": "Háttérstílus",
+  "Optimal Line Breaking": "Optimális sortörés",
+  "Break justified paragraphs as a whole, like TeX, for more even spacing": "A sorkizárt bekezdések egészben, a TeX-hez hasonlóan törve az egyenletesebb térközökért"
 }

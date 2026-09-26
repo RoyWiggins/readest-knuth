@@ -2700,5 +2700,7 @@
   "Dialogue Highlighting": "تمييز الحوار",
   "Background": "الخلفية",
   "Follows the theme color": "يتبع لون السمة",
-  "Background Style": "نمط الخلفية"
+  "Background Style": "نمط الخلفية",
+  "Optimal Line Breaking": "تقسيم الأسطر الأمثل",
+  "Break justified paragraphs as a whole, like TeX, for more even spacing": "تقسيم الفقرات المضبوطة ككل، على طريقة TeX، لتباعد أكثر انتظامًا"
 }

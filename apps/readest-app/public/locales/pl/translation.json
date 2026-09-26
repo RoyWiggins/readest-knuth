@@ -2580,5 +2580,7 @@
   "Dialogue Highlighting": "Podświetlanie dialogów",
   "Background": "Tło",
   "Follows the theme color": "Używa koloru motywu",
-  "Background Style": "Styl tła"
+  "Background Style": "Styl tła",
+  "Optimal Line Breaking": "Optymalne łamanie wierszy",
+  "Break justified paragraphs as a whole, like TeX, for more even spacing": "Łam wyjustowane akapity w całości, jak TeX, dla bardziej równomiernych odstępów"
 }

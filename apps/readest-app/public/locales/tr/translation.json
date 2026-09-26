@@ -2460,5 +2460,7 @@
   "Dialogue Highlighting": "Diyalog Vurgulama",
   "Background": "Arka Plan",
   "Follows the theme color": "Tema rengini kullanır",
-  "Background Style": "Arka Plan Stili"
+  "Background Style": "Arka Plan Stili",
+  "Optimal Line Breaking": "En iyi satır bölme",
+  "Break justified paragraphs as a whole, like TeX, for more even spacing": "Daha düzgün aralıklar için iki yana yaslı paragrafları TeX gibi bir bütün olarak satırlara böl"
 }

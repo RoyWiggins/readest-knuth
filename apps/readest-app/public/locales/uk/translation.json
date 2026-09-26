@@ -2580,5 +2580,7 @@
   "Dialogue Highlighting": "Підсвічування діалогів",
   "Background": "Фон",
   "Follows the theme color": "Використовує колір теми",
-  "Background Style": "Стиль фону"
+  "Background Style": "Стиль фону",
+  "Optimal Line Breaking": "Оптимальне розбиття рядків",
+  "Break justified paragraphs as a whole, like TeX, for more even spacing": "Розбивати вирівняні за шириною абзаци на рядки цілком, як TeX, для рівномірніших інтервалів"
 }

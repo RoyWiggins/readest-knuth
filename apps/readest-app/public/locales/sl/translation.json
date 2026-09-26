@@ -2580,5 +2580,7 @@
   "Dialogue Highlighting": "Označevanje dialogov",
   "Background": "Ozadje",
   "Follows the theme color": "Sledi barvi teme",
-  "Background Style": "Slog ozadja"
+  "Background Style": "Slog ozadja",
+  "Optimal Line Breaking": "Optimalni prelom vrstic",
+  "Break justified paragraphs as a whole, like TeX, for more even spacing": "Obojestransko poravnane odstavke prelomi kot celoto, kot TeX, za enakomernejše razmike"
 }

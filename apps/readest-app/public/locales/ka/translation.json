@@ -2460,5 +2460,7 @@
   "Dialogue Highlighting": "დიალოგის მარკირება",
   "Background": "ფონი",
   "Follows the theme color": "მიჰყვება თემის ფერს",
-  "Background Style": "ფონის სტილი"
+  "Background Style": "ფონის სტილი",
+  "Optimal Line Breaking": "ხაზების ოპტიმალური გადატანა",
+  "Break justified paragraphs as a whole, like TeX, for more even spacing": "გასწორებული აბზაცების ხაზებად დაყოფა მთლიანად, TeX-ის მსგავსად, უფრო თანაბარი დაშორებისთვის"
 }

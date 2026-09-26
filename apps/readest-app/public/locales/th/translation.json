@@ -2400,5 +2400,7 @@
   "Dialogue Highlighting": "ไฮไลต์บทสนทนา",
   "Background": "พื้นหลัง",
   "Follows the theme color": "ตามสีธีม",
-  "Background Style": "รูปแบบพื้นหลัง"
+  "Background Style": "รูปแบบพื้นหลัง",
+  "Optimal Line Breaking": "การตัดบรรทัดที่เหมาะสมที่สุด",
+  "Break justified paragraphs as a whole, like TeX, for more even spacing": "ตัดบรรทัดของย่อหน้าที่จัดชิดขอบทั้งสองด้านโดยพิจารณาทั้งย่อหน้าแบบ TeX เพื่อระยะห่างที่สม่ำเสมอขึ้น"
 }

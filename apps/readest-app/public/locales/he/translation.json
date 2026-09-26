@@ -2520,5 +2520,7 @@
   "Dialogue Highlighting": "הדגשת דיאלוג",
   "Background": "רקע",
   "Follows the theme color": "עוקב אחר צבע ערכת הנושא",
-  "Background Style": "סגנון רקע"
+  "Background Style": "סגנון רקע",
+  "Optimal Line Breaking": "שבירת שורות מיטבית",
+  "Break justified paragraphs as a whole, like TeX, for more even spacing": "שבירת שורות בפסקאות מיושרות כמכלול, כמו ב-TeX, לריווח אחיד יותר"
 }

@@ -2460,5 +2460,7 @@
   "Dialogue Highlighting": "Dialog-Hervorhebung",
   "Background": "Hintergrund",
   "Follows the theme color": "Folgt der Themenfarbe",
-  "Background Style": "Hintergrundstil"
+  "Background Style": "Hintergrundstil",
+  "Optimal Line Breaking": "Optimaler Zeilenumbruch",
+  "Break justified paragraphs as a whole, like TeX, for more even spacing": "Blocksatz-Absätze wie TeX als Ganzes umbrechen, für gleichmäßigere Abstände"
 }

@@ -2400,5 +2400,7 @@
   "Dialogue Highlighting": "对话高亮",
   "Background": "背景",
   "Follows the theme color": "跟随主题颜色",
-  "Background Style": "背景样式"
+  "Background Style": "背景样式",
+  "Optimal Line Breaking": "最佳断行",
+  "Break justified paragraphs as a whole, like TeX, for more even spacing": "像 TeX 一样按整段为两端对齐的段落断行，使词间距更均匀"
 }

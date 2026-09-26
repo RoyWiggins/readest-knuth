@@ -2520,5 +2520,7 @@
   "Dialogue Highlighting": "Surlignage des dialogues",
   "Background": "Fond",
   "Follows the theme color": "Suit la couleur du thème",
-  "Background Style": "Style de fond"
+  "Background Style": "Style de fond",
+  "Optimal Line Breaking": "Coupure de ligne optimale",
+  "Break justified paragraphs as a whole, like TeX, for more even spacing": "Couper les paragraphes justifiés dans leur ensemble, comme TeX, pour un espacement plus régulier"
 }

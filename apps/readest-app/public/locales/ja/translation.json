@@ -2400,5 +2400,7 @@
   "Dialogue Highlighting": "対話ハイライト",
   "Background": "背景",
   "Follows the theme color": "テーマカラーに従う",
-  "Background Style": "背景スタイル"
+  "Background Style": "背景スタイル",
+  "Optimal Line Breaking": "最適な改行",
+  "Break justified paragraphs as a whole, like TeX, for more even spacing": "両端揃えの段落を TeX のように段落全体で改行し、語間を均一にします"
 }

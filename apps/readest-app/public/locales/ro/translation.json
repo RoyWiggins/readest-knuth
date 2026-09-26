@@ -2520,5 +2520,7 @@
   "Dialogue Highlighting": "Evidențierea dialogurilor",
   "Background": "Fundal",
   "Follows the theme color": "Urmează culoarea temei",
-  "Background Style": "Stil fundal"
+  "Background Style": "Stil fundal",
+  "Optimal Line Breaking": "Despărțire optimă a rândurilor",
+  "Break justified paragraphs as a whole, like TeX, for more even spacing": "Împarte paragrafele aliniate stânga-dreapta în ansamblu, ca TeX, pentru spațiere mai uniformă"
 }

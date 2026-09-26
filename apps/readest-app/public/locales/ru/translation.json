@@ -2580,5 +2580,7 @@
   "Dialogue Highlighting": "Подсветка диалогов",
   "Background": "Фон",
   "Follows the theme color": "Следует цвету темы",
-  "Background Style": "Стиль фона"
+  "Background Style": "Стиль фона",
+  "Optimal Line Breaking": "Оптимальный перенос строк",
+  "Break justified paragraphs as a whole, like TeX, for more even spacing": "Разбивать выровненные по ширине абзацы на строки целиком, как TeX, для более равномерных интервалов"
 }

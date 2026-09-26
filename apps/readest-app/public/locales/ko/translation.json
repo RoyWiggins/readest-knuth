@@ -2400,5 +2400,7 @@
   "Dialogue Highlighting": "대화 하이라이팅",
   "Background": "배경",
   "Follows the theme color": "테마 색상을 따름",
-  "Background Style": "배경 스타일"
+  "Background Style": "배경 스타일",
+  "Optimal Line Breaking": "최적 줄 바꿈",
+  "Break justified paragraphs as a whole, like TeX, for more even spacing": "TeX처럼 양쪽 정렬 문단 전체를 고려해 줄을 나누어 간격을 더 고르게 합니다"
 }
