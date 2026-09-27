@@ -454,7 +454,9 @@ const FoliateViewer: React.FC<{
       }
 
       if (viewSettings.knuthPlass && bookDoc.rendition?.layout !== 'pre-paginated') {
-        manageKnuthPlass(detail.doc, true, bookData.book?.primaryLanguage);
+        const book = bookData.book;
+        const cacheKey = book?.hash ? `${book.hash}:${detail.index}` : '';
+        manageKnuthPlass(detail.doc, true, book?.primaryLanguage, cacheKey);
       }
 
       setTimeout(() => {

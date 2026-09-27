@@ -9,6 +9,7 @@ import {
   manageKnuthPlass,
 } from '@/utils/knuthPlassLayout';
 import { loadHyphenator } from '@/utils/hyphenator';
+import { loadLayouts, saveLayouts } from '@/utils/knuthPlassCache';
 
 const TEXT =
   'In olden times when wishing still helped one, there lived a king whose daughters ' +
@@ -210,5 +211,70 @@ describe('applyKnuthPlass', () => {
     await expect.poll(() => p.classList.contains(KP_PARAGRAPH_CLASS), { interval: 5 }).toBe(false);
     await expect.poll(() => p.classList.contains(KP_PARAGRAPH_CLASS)).toBe(true);
     manageKnuthPlass(doc, false);
+  });
+
+  it('sets a paragraph from its cached breaks without measuring it again', async () => {
+    const layouts = new Map<string, number[]>();
+    const first = await makeDoc(`<p>${TEXT}</p>`);
+    applyKnuthPlass(first, { lang: 'en', layouts });
+    expect(layouts.size).toBe(1);
+    const [fingerprint, markers] = [...layouts][0]!;
+    expect(markers.length).toBeGreaterThan(3);
+
+    // Keep only every other break: a set of breaks the algorithm would never
+    // pick, so seeing it proves the cache was used as is.
+    const cached = markers.filter((_, i) => i % 2 === 0);
+    layouts.set(fingerprint, cached);
+    iframe?.remove();
+    const again = await makeDoc(`<p>${TEXT}</p>`);
+    applyKnuthPlass(again, { lang: 'en', layouts });
+    const p = again.querySelector('p')!;
+    // Lines with half the breaks are too long to fit, so the check reverts
+    // them and remembers to leave the paragraph alone.
+    expect(p.querySelectorAll(MARKERS).length).toBe(0);
+    expect(layouts.get(fingerprint)).toEqual([]);
+
+    // A cached "leave alone" is honored too.
+    iframe?.remove();
+    const third = await makeDoc(`<p>${TEXT}</p>`);
+    applyKnuthPlass(third, { lang: 'en', layouts });
+    expect(third.querySelectorAll(MARKERS).length).toBe(0);
+  });
+
+  it('uses cached breaks that still fit', async () => {
+    const layouts = new Map<string, number[]>();
+    applyKnuthPlass(await makeDoc(`<p>${TEXT}</p>`), { lang: 'en', layouts });
+    const [fingerprint, markers] = [...layouts][0]!;
+    // One break more, just after the first: short lines always fit.
+    const extra = [...markers, markers[0]! + 8].sort((a, b) => a - b);
+    layouts.set(fingerprint, extra);
+    iframe?.remove();
+    const doc = await makeDoc(`<p>${TEXT}</p>`);
+    applyKnuthPlass(doc, { lang: 'en', layouts });
+    expect(doc.querySelectorAll(MARKERS).length).toBe(extra.length);
+  });
+
+  it('keys the cache by the layout: a new width is set afresh', async () => {
+    const layouts = new Map<string, number[]>();
+    applyKnuthPlass(await makeDoc(`<p>${TEXT}</p>`), { lang: 'en', layouts });
+    iframe?.remove();
+    applyKnuthPlass(await makeDoc(`<p style="width: 400px">${TEXT}</p>`), { lang: 'en', layouts });
+    expect(layouts.size).toBe(2);
+  });
+
+  it('saves and loads a section’s layouts', async () => {
+    const key = `test:${Math.random()}`;
+    await saveLayouts(
+      key,
+      new Map([
+        ['abc', [10, 21]],
+        ['def', []],
+      ]),
+    );
+    expect([...(await loadLayouts(key))]).toEqual([
+      ['abc', [10, 21]],
+      ['def', []],
+    ]);
+    expect((await loadLayouts('missing')).size).toBe(0);
   });
 });

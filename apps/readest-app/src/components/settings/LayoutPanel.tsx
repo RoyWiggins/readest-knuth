@@ -213,10 +213,13 @@ const LayoutPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRese
       const keys = isGlobal ? bookKeys : bookKey ? [bookKey] : [];
       keys.forEach((key) => {
         const vs = getViewSettings(key);
-        const lang = useBookDataStore.getState().getBookData(key)?.book?.primaryLanguage;
+        const book = useBookDataStore.getState().getBookData(key)?.book;
         getView(key)
           ?.renderer.getContents()
-          .forEach(({ doc }) => manageKnuthPlass(doc, !!vs?.knuthPlass, lang));
+          .forEach(({ doc, index }) => {
+            const cacheKey = book?.hash && index !== undefined ? `${book.hash}:${index}` : '';
+            manageKnuthPlass(doc, !!vs?.knuthPlass, book?.primaryLanguage, cacheKey);
+          });
       });
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps

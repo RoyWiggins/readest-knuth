@@ -27,6 +27,7 @@ import {
   raggedBreak,
 } from './knuthPlass';
 import { Hyphenator, loadHyphenator } from './hyphenator';
+import { loadLayouts, saveLayouts } from './knuthPlassCache';
 
 export const KP_PARAGRAPH_CLASS = 'readest-kp';
 export const KP_MEASURE_CLASS = 'readest-kp-measure';
@@ -63,6 +64,9 @@ const SLACK_PX = 1;
 // White space a left-aligned line may leave at its end before it counts as
 // fully loose (TeX's \raggedright uses 2em; a narrow page needs a little more).
 const RAGGED_STRETCH_EM = 3;
+// Part of every cache fingerprint: bump it when a change to this module or
+// knuthPlass.ts would pick different breaks for the same paragraph.
+const LAYOUT_VERSION = 1;
 
 type TextEntry = { node: Text; start: number; end: number };
 
@@ -83,16 +87,29 @@ type Paragraph = {
   width: number;
   indent: number;
   hyphenWidth: number;
+  // Everything its breaks depend on, hashed: the key of the layout cache.
+  fingerprint: string;
 };
 
-type Line = {
-  firstBox: Box;
-  // Last box of the line, or the hyphen span when the line ends hyphenated.
-  end: Box | HTMLElement;
-  width: number;
-};
+// A chosen break: the text offset of its marker, times two, plus one when the
+// break draws a hyphen. Compact, since whole sections of these are cached.
+type Marker = number;
 
-type SetParagraph = { el: HTMLElement; lines: Line[] };
+type SetParagraph = { paragraph: Paragraph; markers: Marker[]; hyphens: HTMLElement[] };
+
+// cyrb53, a fast string hash with few collisions, as a short base-36 string.
+const hash = (text: string): string => {
+  let h1 = 0xdeadbeef;
+  let h2 = 0x41c6ce57;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+};
 
 const collectEntries = (el: HTMLElement): { entries: TextEntry[]; text: string } => {
   const doc = el.ownerDocument;
@@ -232,16 +249,36 @@ const findParagraphs = (
         : 0);
     if (!(contentWidth > 0)) continue;
     const { entries, text } = collectEntries(el);
+    const hyphenate = style.hyphens === 'auto' && !!hyphenators.get(lang);
+    const ragged = style.textAlign !== 'justify';
+    const indent = px(style.textIndent, contentWidth);
     paragraphs.push({
       el,
       text,
       entries,
       lang,
-      hyphenate: style.hyphens === 'auto' && !!hyphenators.get(lang),
-      ragged: style.textAlign !== 'justify',
+      hyphenate,
+      ragged,
       width: contentWidth,
-      indent: px(style.textIndent, contentWidth),
+      indent,
       hyphenWidth: measureHyphen(doc, style),
+      // Inline markup inside the paragraph (italics, small caps) is left out:
+      // should its styling change, a stale entry at worst fails fitsMeasure.
+      fingerprint: hash(
+        [
+          LAYOUT_VERSION,
+          text,
+          contentWidth,
+          indent,
+          fontOf(style),
+          style.wordSpacing,
+          style.letterSpacing,
+          style.fontVariant,
+          style.textTransform,
+          ragged,
+          hyphenate && lang,
+        ].join('\n'),
+      ),
     });
   }
   return paragraphs;
@@ -408,39 +445,29 @@ const insertAt = (entries: TextEntry[], offset: number, inserted: Node) => {
   target.parentNode!.insertBefore(inserted, target);
 };
 
-const applyBreaks = (paragraph: Paragraph, items: Item[], breaks: KPBreak[]): SetParagraph => {
+// The markers for a paragraph's breaks, the last (the paragraph's end) aside.
+const toMarkers = (items: Item[], breaks: KPBreak[]): Marker[] =>
+  breaks.slice(0, -1).flatMap(({ position }): Marker[] => {
+    const item = items[position]!;
+    // Before the space, so the space starts the next line, where the engine
+    // drops it: after it, the space would end this line short of the edge.
+    if (item.type === 'glue' && 'start' in item) return [item.start * 2];
+    if (item.type === 'penalty' && 'hyphen' in item) return [item.offset * 2 + +item.hyphen];
+    return [];
+  });
+
+const insertMarkers = (paragraph: Paragraph, markers: Marker[]): SetParagraph => {
   const { el, entries } = paragraph;
   const doc = el.ownerDocument;
-  const insertions: { offset: number; marker: HTMLElement }[] = [];
-  const lines: Line[] = [];
-  let start = 0;
-  breaks.slice(0, -1).forEach(({ position }, index) => {
-    while (start < position && items[start]!.type !== 'box') start++;
-    const firstBox = items[start] as Box;
-    let end: Box | HTMLElement = firstBox;
-    for (let i = start; i < position; i++) {
-      const item = items[i]!;
-      if (item.type === 'box') end = item as Box;
-    }
-    const item = items[position]!;
-    if (item.type === 'glue' && 'start' in item) {
-      // Before the space, so the space starts the next line, where the engine
-      // drops it: after it, the space would end this line short of the edge.
-      insertions.push({ offset: item.start, marker: makeElement(doc, KP_BREAK_CLASS) });
-    } else if (item.type === 'penalty' && 'hyphen' in item) {
-      const marker = makeElement(doc, item.hyphen ? KP_HYPHEN_CLASS : KP_BREAK_CLASS);
-      if (item.hyphen) end = marker;
-      insertions.push({ offset: item.offset, marker });
-    }
-    lines.push({ firstBox, end, width: paragraph.width - (index === 0 ? paragraph.indent : 0) });
-    start = position + 1;
-  });
+  const hyphens: HTMLElement[] = [];
   // Back to front, so the entries of earlier offsets stay valid.
-  insertions
-    .sort((a, b) => b.offset - a.offset)
-    .forEach(({ offset, marker }) => insertAt(entries, offset, marker));
+  for (const marker of [...markers].reverse()) {
+    const span = makeElement(doc, marker % 2 ? KP_HYPHEN_CLASS : KP_BREAK_CLASS);
+    if (marker % 2) hyphens.unshift(span);
+    insertAt(entries, marker >> 1, span);
+  }
   el.classList.add(KP_PARAGRAPH_CLASS);
-  return { el, lines };
+  return { paragraph, markers, hyphens };
 };
 
 const revertParagraph = (el: HTMLElement) => {
@@ -457,21 +484,26 @@ export const clearKnuthPlass = (doc: Document) => {
 // Measuring can be off a little (kerning across spaces, inline padding). A
 // line that came out longer than the measure cannot wrap, and would run past
 // the edge of the page: leave such a paragraph to the engine.
-const fitsMeasure = ({ el, lines }: SetParagraph): boolean => {
+const fitsMeasure = ({ paragraph, markers, hyphens }: SetParagraph): boolean => {
+  const { el, indent, width } = paragraph;
   const doc = el.ownerDocument;
-  const { entries } = collectEntries(el);
-  return lines.every((line) => {
-    const head = lineExtents(
-      rangeOf(doc, entries, line.firstBox.start, line.firstBox.start + 1),
-    )[0];
-    const tail =
-      // Not `instanceof HTMLElement`: the span belongs to the book's frame.
-      (
-        'nodeType' in line.end
-          ? [...line.end.getClientRects()]
-          : lineExtents(rangeOf(doc, entries, line.end.end - 1, line.end.end))
-      ).at(-1);
-    return !!head && !!tail && tail.right - head.left <= line.width + 0.5;
+  const { entries, text } = collectEntries(el);
+  const skipSpaces = (offset: number) => {
+    while (/\s/.test(text[offset] ?? '')) offset++;
+    return offset;
+  };
+  const drawnHyphens = [...hyphens];
+  let start = skipSpaces(0);
+  return markers.every((marker, i) => {
+    const end = marker >> 1;
+    const head = lineExtents(rangeOf(doc, entries, start, start + 1))[0];
+    const tail = (
+      marker % 2
+        ? [...drawnHyphens.shift()!.getClientRects()]
+        : lineExtents(rangeOf(doc, entries, end - 1, end))
+    ).at(-1);
+    start = skipSpaces(end);
+    return !!head && !!tail && tail.right - head.left <= width - (i === 0 ? indent : 0) + 0.5;
   });
 };
 
@@ -508,30 +540,45 @@ const ensureStyles = (doc: Document) => {
 
 // Set `paragraphs`, reading and writing the layout in bulk: one measuring
 // pass over them all, one pass inserting the breaks, one checking them, so
-// each batch costs a few layouts rather than a few per paragraph.
-const setParagraphs = (paragraphs: Paragraph[], hyphenators: Map<string, Hyphenator | null>) => {
-  if (paragraphs.length === 0) return;
+// each batch costs a few layouts rather than a few per paragraph. Paragraphs
+// found in `layouts` skip the measuring; the rest are added to it, with no
+// markers when the engine is to keep them.
+const setParagraphs = (
+  paragraphs: Paragraph[],
+  hyphenators: Map<string, Hyphenator | null>,
+  layouts: Map<string, Marker[]>,
+) => {
+  const fresh = paragraphs.filter(({ fingerprint }) => !layouts.has(fingerprint));
 
   // Measure at natural spacing with no engine hyphenation.
-  paragraphs.forEach(({ el }) => el.classList.add(KP_MEASURE_CLASS));
-  const itemized = paragraphs.map((paragraph) => itemize(paragraph, hyphenators));
-  paragraphs.forEach(({ el }) => el.classList.remove(KP_MEASURE_CLASS));
+  fresh.forEach(({ el }) => el.classList.add(KP_MEASURE_CLASS));
+  const itemized = fresh.map((paragraph) => itemize(paragraph, hyphenators));
+  fresh.forEach(({ el }) => el.classList.remove(KP_MEASURE_CLASS));
 
-  const set: SetParagraph[] = [];
-  paragraphs.forEach((paragraph, i) => {
+  fresh.forEach((paragraph, i) => {
     const items = itemized[i];
-    if (!items) return;
     const lineWidth = (line: number) =>
       paragraph.width - SLACK_PX - (line === 0 ? paragraph.indent : 0);
-    for (const tolerance of TOLERANCES) {
-      const breaks = breakLines(items, lineWidth, { tolerance });
+    let markers: Marker[] = [];
+    for (const tolerance of items ? TOLERANCES : []) {
+      const breaks = breakLines(items!, lineWidth, { tolerance });
       if (!breaks) continue;
-      if (breaks.length > 1) set.push(applyBreaks(paragraph, items, breaks));
+      markers = toMarkers(items!, breaks);
       break;
     }
+    layouts.set(paragraph.fingerprint, markers);
   });
 
-  set.filter((paragraph) => !fitsMeasure(paragraph)).forEach(({ el }) => revertParagraph(el));
+  paragraphs
+    .flatMap((paragraph) => {
+      const markers = layouts.get(paragraph.fingerprint)!;
+      return markers.length ? [insertMarkers(paragraph, markers)] : [];
+    })
+    .filter((set) => !fitsMeasure(set))
+    .forEach(({ paragraph }) => {
+      revertParagraph(paragraph.el);
+      layouts.set(paragraph.fingerprint, []);
+    });
 };
 
 /**
@@ -541,11 +588,15 @@ const setParagraphs = (paragraphs: Paragraph[], hyphenators: Map<string, Hyphena
  */
 export const applyKnuthPlass = (
   doc: Document,
-  { lang = '', hyphenators = new Map<string, Hyphenator | null>() } = {},
+  {
+    lang = '',
+    hyphenators = new Map<string, Hyphenator | null>(),
+    layouts = new Map<string, Marker[]>(),
+  } = {},
 ) => {
   clearKnuthPlass(doc);
   ensureStyles(doc);
-  setParagraphs(findParagraphs(doc, lang, hyphenators), hyphenators);
+  setParagraphs(findParagraphs(doc, lang, hyphenators), hyphenators, layouts);
 };
 
 // The paragraphs in the order the reader needs them: those on screen, then
@@ -625,7 +676,7 @@ const BATCH_MS = 8;
 // settle before setting the paragraphs again.
 const RESTYLE_DELAY_MS = 150;
 
-const createController = (doc: Document, lang: string): Controller => {
+const createController = (doc: Document, lang: string, cacheKey: string): Controller => {
   const win = doc.defaultView!;
   let signature = '';
   let samples: Element[] = [];
@@ -637,6 +688,8 @@ const createController = (doc: Document, lang: string): Controller => {
   // Bumped whenever a run in progress is superseded or the controller stops.
   let generation = 0;
   const hyphenators = new Map<string, Hyphenator | null>();
+  // Every layout this section has had while open, seeded from the cache.
+  const layouts = cacheKey ? loadLayouts(cacheKey) : Promise.resolve(new Map<string, Marker[]>());
 
   const run = async () => {
     const current = generation;
@@ -654,6 +707,7 @@ const createController = (doc: Document, lang: string): Controller => {
         .map(async (l) => hyphenators.set(l, await loadHyphenator(l))),
     );
     await doc.fonts?.ready;
+    const known = await layouts;
     if (superseded()) return;
     ensureStyles(doc);
     const { ordered, visible } = inReadingOrder(
@@ -665,7 +719,7 @@ const createController = (doc: Document, lang: string): Controller => {
     let size = Math.max(visible, 1);
     for (let i = 0; i < ordered.length; ) {
       const started = performance.now();
-      setParagraphs(ordered.slice(i, i + size), hyphenators);
+      setParagraphs(ordered.slice(i, i + size), hyphenators, known);
       i += size;
       const elapsed = Math.max(performance.now() - started, 1);
       size = Math.max(1, Math.round((size * BATCH_MS) / elapsed));
@@ -679,6 +733,13 @@ const createController = (doc: Document, lang: string): Controller => {
     samples.forEach((el) => resizeObserver.observe(el));
     widths = readWidths();
     signature = layoutSignature(doc, samples, widths);
+    // Only the layout the section has now is worth keeping for next time.
+    if (cacheKey) {
+      void saveLayouts(
+        cacheKey,
+        new Map(ordered.map(({ fingerprint }) => [fingerprint, known.get(fingerprint)!])),
+      );
+    }
   };
 
   // Our own insertions resize the body too; only a change in what the lines
@@ -738,9 +799,10 @@ const createController = (doc: Document, lang: string): Controller => {
 /**
  * Turn Knuth–Plass line breaking on or off for a loaded section. While on, the
  * paragraphs are set again whenever the page width or text style changes.
- * `lang` is the book's language, used where the markup declares none.
+ * `lang` is the book's language, used where the markup declares none;
+ * `cacheKey` names the section (book and index) in the persistent layout cache.
  */
-export const manageKnuthPlass = (doc: Document, enabled: boolean, lang = '') => {
+export const manageKnuthPlass = (doc: Document, enabled: boolean, lang = '', cacheKey = '') => {
   const existing = controllers.get(doc);
   if (!enabled) {
     existing?.destroy();
@@ -748,7 +810,7 @@ export const manageKnuthPlass = (doc: Document, enabled: boolean, lang = '') => 
     return;
   }
   if (!doc.defaultView || !doc.documentElement) return;
-  const controller = existing ?? createController(doc, lang);
+  const controller = existing ?? createController(doc, lang, cacheKey);
   controller.lang = lang;
   controllers.set(doc, controller);
   controller.refresh();
