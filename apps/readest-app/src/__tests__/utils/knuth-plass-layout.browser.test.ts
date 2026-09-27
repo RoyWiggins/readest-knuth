@@ -4,7 +4,6 @@ import {
   applyKnuthPlass,
   clearKnuthPlass,
   KP_BREAK_CLASS,
-  KP_GAP_CLASS,
   KP_HYPHEN_CLASS,
   KP_PARAGRAPH_CLASS,
   manageKnuthPlass,
@@ -27,6 +26,8 @@ const STYLE = `
 `;
 
 let iframe: HTMLIFrameElement | null = null;
+
+const MARKERS = `.${KP_BREAK_CLASS}, .${KP_HYPHEN_CLASS}`;
 
 const makeDoc = async (body: string): Promise<Document> => {
   iframe = document.createElement('iframe');
@@ -70,7 +71,7 @@ describe('applyKnuthPlass', () => {
     applyKnuthPlass(doc, { lang: 'en' });
 
     expect(p.classList.contains(KP_PARAGRAPH_CLASS)).toBe(true);
-    const breaks = p.querySelectorAll(`.${KP_BREAK_CLASS}`);
+    const breaks = p.querySelectorAll(MARKERS);
     expect(breaks.length).toBeGreaterThan(3);
 
     const lines = renderedLines(p);
@@ -99,8 +100,13 @@ describe('applyKnuthPlass', () => {
     const selected = range.toString();
 
     applyKnuthPlass(doc, { lang: 'en' });
-    expect(p.querySelectorAll(`.${KP_GAP_CLASS}`).length).toBeGreaterThan(10);
+    expect(p.querySelectorAll(MARKERS).length).toBeGreaterThan(3);
     expect(p.textContent).toBe(textBefore);
+    // Copying the paragraph gives its text back: no line breaks, no markers.
+    const selection = doc.getSelection()!;
+    selection.selectAllChildren(p);
+    expect(selection.toString()).toBe(textBefore);
+    selection.removeAllRanges();
     expect(range.toString()).toBe(selected);
     expect(CFI.fromRange(range)).toBe(cfiBefore);
     expect(CFI.toRange(doc, CFI.parse(cfiBefore)).toString()).toBe(selected);
@@ -120,10 +126,11 @@ describe('applyKnuthPlass', () => {
     applyKnuthPlass(doc, { lang: 'en', hyphenators: new Map([['en', hyphenator]]) });
     const hyphens = p.querySelectorAll(`.${KP_HYPHEN_CLASS}`);
     expect(hyphens.length).toBeGreaterThan(0);
-    expect(doc.defaultView!.getComputedStyle(hyphens[0]!, '::after').content).toBe('"-"');
+    expect(doc.defaultView!.getComputedStyle(hyphens[0]!, '::after').content).toBe('"-\u200B"');
     // Every hyphen sits at a line end.
+    const contentRight = p.getBoundingClientRect().right;
     hyphens.forEach((hyphen) =>
-      expect(hyphen.nextElementSibling?.classList.contains(KP_BREAK_CLASS)).toBe(true),
+      expect(Math.abs(contentRight - hyphen.getBoundingClientRect().right)).toBeLessThan(0.75),
     );
   });
 
@@ -141,8 +148,7 @@ describe('applyKnuthPlass', () => {
 
     applyKnuthPlass(doc, { lang: 'en' });
     expect(p.classList.contains(KP_PARAGRAPH_CLASS)).toBe(true);
-    expect(p.querySelectorAll(`.${KP_GAP_CLASS}`).length).toBe(0);
-    const breaks = p.querySelectorAll(`.${KP_BREAK_CLASS}`).length;
+    const breaks = p.querySelectorAll(MARKERS).length;
     const lines = renderedLines(p);
     expect(lines.length).toBe(breaks + 1);
     for (const line of lines) expect(line.right).toBeLessThanOrEqual(contentRight + 0.5);
@@ -155,7 +161,7 @@ describe('applyKnuthPlass', () => {
       `<p style="text-align: center">${TEXT}</p><p>Line one<br>line two</p><p>Short.</p>`,
     );
     applyKnuthPlass(doc, { lang: 'en' });
-    expect(doc.querySelectorAll(`.${KP_BREAK_CLASS}, .${KP_GAP_CLASS}`).length).toBe(0);
+    expect(doc.querySelectorAll(MARKERS).length).toBe(0);
   });
 
   it('sets the paragraphs again when the width changes', async () => {
@@ -163,11 +169,11 @@ describe('applyKnuthPlass', () => {
     const p = doc.querySelector('p')!;
     manageKnuthPlass(doc, true, 'en');
     await expect.poll(() => p.classList.contains(KP_PARAGRAPH_CLASS)).toBe(true);
-    const before = p.querySelectorAll(`.${KP_BREAK_CLASS}`).length;
+    const before = p.querySelectorAll(MARKERS).length;
     doc.head.insertAdjacentHTML('beforeend', '<style>p { width: 420px !important }</style>');
     await expect
       .poll(() => {
-        const count = p.querySelectorAll(`.${KP_BREAK_CLASS}`).length;
+        const count = p.querySelectorAll(MARKERS).length;
         return count > 0 && count < before;
       })
       .toBe(true);
@@ -177,5 +183,32 @@ describe('applyKnuthPlass', () => {
     }
     manageKnuthPlass(doc, false);
     expect(doc.querySelectorAll(`.${KP_PARAGRAPH_CLASS}`).length).toBe(0);
+  });
+
+  it('sets a long section in batches, the paragraphs on screen first', async () => {
+    const doc = await makeDoc(Array.from({ length: 300 }, () => `<p>${TEXT}</p>`).join(''));
+    const paragraphs = [...doc.querySelectorAll('p')];
+    const onScreen = paragraphs[150]!;
+    onScreen.scrollIntoView();
+    const setCount = () => doc.querySelectorAll(`.${KP_PARAGRAPH_CLASS}`).length;
+
+    manageKnuthPlass(doc, true, 'en');
+    await expect.poll(() => onScreen.classList.contains(KP_PARAGRAPH_CLASS)).toBe(true);
+    // The page was not blocked until the whole section was done.
+    expect(setCount()).toBeLessThan(paragraphs.length);
+    await expect.poll(setCount, { timeout: 20000 }).toBe(paragraphs.length);
+    manageKnuthPlass(doc, false);
+  });
+
+  it('clears at once on a style change and sets the paragraphs again once it settles', async () => {
+    const doc = await makeDoc(`<p>${TEXT}</p>`);
+    const p = doc.querySelector('p')!;
+    manageKnuthPlass(doc, true, 'en');
+    await expect.poll(() => p.classList.contains(KP_PARAGRAPH_CLASS)).toBe(true);
+    doc.head.insertAdjacentHTML('beforeend', '<style>p { word-spacing: 2px !important }</style>');
+    // Breaks set for the old spacing would no longer fit: gone within a frame.
+    await expect.poll(() => p.classList.contains(KP_PARAGRAPH_CLASS), { interval: 5 }).toBe(false);
+    await expect.poll(() => p.classList.contains(KP_PARAGRAPH_CLASS)).toBe(true);
+    manageKnuthPlass(doc, false);
   });
 });

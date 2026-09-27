@@ -5,15 +5,13 @@
  * rivers of wide gaps in justified text on narrow screens, and a jagged edge
  * with stray short lines in left-aligned text. This measures each paragraph,
  * picks all of its breaks at once with the Knuth–Plass algorithm
- * (knuthPlass.ts), and makes the engine lay the paragraph out that way:
- *
- * - a `<br>` at each chosen break, so the engine cannot pick another one;
- * - in justified paragraphs, an empty inline spacer before every inter-word
- *   space whose horizontal margin stretches or shrinks that space to the
- *   line's adjustment ratio (lines ending in a forced break are not justified
- *   by the engine); left-aligned paragraphs keep their natural spaces and are
- *   set for an even rag instead;
- * - an empty span whose `::after` draws the hyphen at a hyphenated break.
+ * (knuthPlass.ts), and makes the engine lay the paragraph out that way. The
+ * paragraph gets `white-space: nowrap`, so its own spaces no longer wrap, and
+ * each chosen break gets an empty span whose `::after` holds a zero-width
+ * space with `white-space: normal` (behind a hyphen at a hyphenated break):
+ * the only places left where a line can end. The engine then justifies those
+ * lines itself, or leaves them ragged in left-aligned text, where the breaks
+ * are chosen for an even rag instead of even spacing.
  *
  * Every inserted element is `cfi-inert` and holds no text, and text nodes are
  * only ever split in place (never moved), so CFIs, live ranges (reading
@@ -27,17 +25,15 @@ import {
   KPPenalty,
   paragraphEnd,
   raggedBreak,
-  KP_INFINITY,
 } from './knuthPlass';
 import { Hyphenator, loadHyphenator } from './hyphenator';
 
 export const KP_PARAGRAPH_CLASS = 'readest-kp';
 export const KP_MEASURE_CLASS = 'readest-kp-measure';
 export const KP_BREAK_CLASS = 'readest-kp-br';
-export const KP_GAP_CLASS = 'readest-kp-gap';
 export const KP_HYPHEN_CLASS = 'readest-kp-hyphen';
 
-const INSERTED_SELECTOR = `.${KP_BREAK_CLASS}, .${KP_GAP_CLASS}, .${KP_HYPHEN_CLASS}`;
+const INSERTED_SELECTOR = `.${KP_BREAK_CLASS}, .${KP_HYPHEN_CLASS}`;
 
 // Text blocks that may be set. A div counts only when it holds nothing
 // but inline content, which the eligibility check below enforces.
@@ -61,12 +57,8 @@ const TOLERANCES = [2, 4, 12];
 const HYPHEN_MIN_BEFORE = 2;
 const HYPHEN_MIN_AFTER = 3;
 const MIN_HYPHENATE_LENGTH = 5;
-// Keep set lines this far short of the measure: engines snap each spacer's
-// margin to a layout unit (1/64 px), and a line that ends up a hair too long
-// wraps its last word onto a line of its own.
-const SAFETY_PX = 0.25;
 // Breaks are chosen against a measure this much narrower, leaving room for
-// measuring error that the correction pass then takes back out.
+// measuring error: a line that came out too long would overflow the page.
 const SLACK_PX = 1;
 // White space a left-aligned line may leave at its end before it counts as
 // fully loose (TeX's \raggedright uses 2em; a narrow page needs a little more).
@@ -97,7 +89,6 @@ type Line = {
   firstBox: Box;
   // Last box of the line, or the hyphen span when the line ends hyphenated.
   end: Box | HTMLElement;
-  gaps: HTMLElement[];
   width: number;
 };
 
@@ -133,8 +124,17 @@ const locate = (entries: TextEntry[], offset: number, atEnd = false) => {
   return { node: entry.node, offset: offset - entry.start };
 };
 
+// One range per document, reused for every measurement: the engine updates
+// each live range on every text-node split, so a fresh range per word made
+// inserting the breaks quadratic in the size of the chapter.
+const measureRanges = new WeakMap<Document, Range>();
+
 const rangeOf = (doc: Document, entries: TextEntry[], start: number, end: number): Range => {
-  const range = doc.createRange();
+  let range = measureRanges.get(doc);
+  if (!range) {
+    range = doc.createRange();
+    measureRanges.set(doc, range);
+  }
   const from = locate(entries, start);
   const to = locate(entries, end, true);
   range.setStart(from.node, from.offset);
@@ -239,7 +239,7 @@ const findParagraphs = (
       lang,
       hyphenate: style.hyphens === 'auto' && !!hyphenators.get(lang),
       ragged: style.textAlign !== 'justify',
-      width: contentWidth - SAFETY_PX,
+      width: contentWidth,
       indent: px(style.textIndent, contentWidth),
       hyphenWidth: measureHyphen(doc, style),
     });
@@ -360,11 +360,10 @@ const itemize = (
   for (const pending of pendingGlue) {
     const width = gapWidth(pending);
     const glueWidth = width !== null && width > 0 ? width : typical;
-    // Stretch by half like TeX, but shrink by a fifth rather than TeX's third:
-    // browser fonts' spaces are already narrower than Computer Modern's.
+    // Stretch by half like TeX. No shrink: the engine justifies the lines,
+    // and it only ever widens spaces.
     pending.glue.width = glueWidth;
     pending.glue.stretch = glueWidth / 2;
-    pending.glue.shrink = glueWidth / 5;
   }
 
   const body = paragraph.ragged
@@ -377,13 +376,13 @@ const itemize = (
 // `stretch` of white space, while the spaces themselves keep their width.
 const toRagged = (items: Item[], stretch: number): Item[] =>
   items.flatMap((item): Item[] => {
-    if (item.type === 'glue' && 'end' in item) {
+    if (item.type === 'glue' && 'start' in item) {
       const space: Penalty = {
         type: 'penalty',
         width: 0,
         penalty: 0,
         flagged: false,
-        offset: item.end,
+        offset: item.start,
         hyphen: false,
       };
       return raggedBreak(space, stretch, item.width);
@@ -392,78 +391,54 @@ const toRagged = (items: Item[], stretch: number): Item[] =>
     return [item];
   });
 
-const makeElement = (doc: Document, tag: string, className: string): HTMLElement => {
-  const el = doc.createElement(tag);
+const makeElement = (doc: Document, className: string): HTMLElement => {
+  const el = doc.createElement('span');
   el.className = className;
   el.setAttribute('cfi-inert', '');
   el.setAttribute('aria-hidden', 'true');
   return el;
 };
 
-// Insert `nodes` before the character at `offset`, splitting its text node in
+// Insert `inserted` before the character at `offset`, splitting its text node in
 // place. Callers go from the end of the paragraph backwards, so the entries of
 // earlier offsets still describe the (now shorter) original nodes.
-const insertAt = (entries: TextEntry[], offset: number, nodes: Node[]) => {
+const insertAt = (entries: TextEntry[], offset: number, inserted: Node) => {
   const { node, offset: local } = locate(entries, offset);
   const target = local > 0 ? node.splitText(local) : node;
-  for (const inserted of nodes) target.parentNode!.insertBefore(inserted, target);
-};
-
-const setGap = (gap: HTMLElement, amount: number) => {
-  gap.style.marginRight = `${amount.toFixed(3)}px`;
+  target.parentNode!.insertBefore(inserted, target);
 };
 
 const applyBreaks = (paragraph: Paragraph, items: Item[], breaks: KPBreak[]): SetParagraph => {
   const { el, entries } = paragraph;
   const doc = el.ownerDocument;
-  const insertions: { offset: number; nodes: Node[]; order: number }[] = [];
+  const insertions: { offset: number; marker: HTMLElement }[] = [];
   const lines: Line[] = [];
   let start = 0;
-  breaks.forEach(({ position, ratio }, index) => {
+  breaks.slice(0, -1).forEach(({ position }, index) => {
     while (start < position && items[start]!.type !== 'box') start++;
     const firstBox = items[start] as Box;
-    const isLast = index === breaks.length - 1;
-    const gaps: HTMLElement[] = [];
-    let lastBox = firstBox;
+    let end: Box | HTMLElement = firstBox;
     for (let i = start; i < position; i++) {
       const item = items[i]!;
-      if (item.type === 'box') lastBox = item;
-      // The last line keeps its natural spacing unless it had to shrink.
-      if (paragraph.ragged || item.type !== 'glue' || !('start' in item)) continue;
-      if (item.stretch >= KP_INFINITY || (isLast && ratio >= 0)) continue;
-      const gap = makeElement(doc, 'span', KP_GAP_CLASS);
-      setGap(gap, ratio * (ratio < 0 ? item.shrink : item.stretch));
-      gaps.push(gap);
-      insertions.push({ offset: item.start, nodes: [gap], order: 0 });
+      if (item.type === 'box') end = item as Box;
     }
-    let end: Box | HTMLElement = lastBox;
-    if (!isLast) {
-      const item = items[position]!;
-      const br = makeElement(doc, 'br', KP_BREAK_CLASS);
-      if (item.type === 'glue' && 'end' in item) {
-        insertions.push({ offset: item.end, nodes: [br], order: 1 });
-      } else if (item.type === 'penalty' && 'hyphen' in item) {
-        const nodes: Node[] = [br];
-        if (item.hyphen) {
-          end = makeElement(doc, 'span', KP_HYPHEN_CLASS);
-          nodes.unshift(end);
-        }
-        insertions.push({ offset: item.offset, nodes, order: 1 });
-      }
+    const item = items[position]!;
+    if (item.type === 'glue' && 'start' in item) {
+      // Before the space, so the space starts the next line, where the engine
+      // drops it: after it, the space would end this line short of the edge.
+      insertions.push({ offset: item.start, marker: makeElement(doc, KP_BREAK_CLASS) });
+    } else if (item.type === 'penalty' && 'hyphen' in item) {
+      const marker = makeElement(doc, item.hyphen ? KP_HYPHEN_CLASS : KP_BREAK_CLASS);
+      if (item.hyphen) end = marker;
+      insertions.push({ offset: item.offset, marker });
     }
-    lines.push({
-      firstBox,
-      end,
-      gaps,
-      width: paragraph.width - (index === 0 ? paragraph.indent : 0),
-    });
+    lines.push({ firstBox, end, width: paragraph.width - (index === 0 ? paragraph.indent : 0) });
     start = position + 1;
   });
-  // Back to front; at one offset, the break goes in before (so ends up after)
-  // a spacer, which belongs to the next line's first space.
+  // Back to front, so the entries of earlier offsets stay valid.
   insertions
-    .sort((a, b) => b.offset - a.offset || b.order - a.order)
-    .forEach(({ offset, nodes }) => insertAt(entries, offset, nodes));
+    .sort((a, b) => b.offset - a.offset)
+    .forEach(({ offset, marker }) => insertAt(entries, offset, marker));
   el.classList.add(KP_PARAGRAPH_CLASS);
   return { el, lines };
 };
@@ -474,40 +449,30 @@ const revertParagraph = (el: HTMLElement) => {
   el.normalize();
 };
 
-/** Remove every Knuth–Plass break and spacer from the document. */
+/** Remove every Knuth–Plass break from the document. */
 export const clearKnuthPlass = (doc: Document) => {
   doc.querySelectorAll<HTMLElement>(`.${KP_PARAGRAPH_CLASS}`).forEach(revertParagraph);
 };
 
-// The engine draws glyphs a little differently than the ranges measured them
-// (kerning across spaces, inline padding): measure each set line and spread the
-// difference over its spaces. A line whose last word wrapped means the
-// measurement was off by more than the line could absorb; the paragraph is
-// then left to the engine.
-const correctParagraph = ({ el, lines }: SetParagraph): (() => void) | null => {
+// Measuring can be off a little (kerning across spaces, inline padding). A
+// line that came out longer than the measure cannot wrap, and would run past
+// the edge of the page: leave such a paragraph to the engine.
+const fitsMeasure = ({ el, lines }: SetParagraph): boolean => {
   const doc = el.ownerDocument;
   const { entries } = collectEntries(el);
-  const fixes: (() => void)[] = [];
-  for (const [index, line] of lines.entries()) {
-    const first = lineExtents(rangeOf(doc, entries, line.firstBox.start, line.firstBox.start + 1));
-    const last =
+  return lines.every((line) => {
+    const head = lineExtents(
+      rangeOf(doc, entries, line.firstBox.start, line.firstBox.start + 1),
+    )[0];
+    const tail =
       // Not `instanceof HTMLElement`: the span belongs to the book's frame.
-      'nodeType' in line.end
-        ? [...line.end.getClientRects()]
-        : lineExtents(rangeOf(doc, entries, line.end.end - 1, line.end.end));
-    const head = first[0];
-    const tail = last.at(-1);
-    if (!head || !tail) return () => revertParagraph(el);
-    const mid = (tail.top + tail.bottom) / 2;
-    if (mid < head.top || mid > head.bottom) return () => revertParagraph(el);
-    if (index === lines.length - 1 || line.gaps.length === 0) continue;
-    const delta = (head.left + line.width - tail.right) / line.gaps.length;
-    if (Math.abs(delta) < 0.01) continue;
-    fixes.push(() =>
-      line.gaps.forEach((gap) => setGap(gap, (parseFloat(gap.style.marginRight) || 0) + delta)),
-    );
-  }
-  return fixes.length ? () => fixes.forEach((fix) => fix()) : null;
+      (
+        'nodeType' in line.end
+          ? [...line.end.getClientRects()]
+          : lineExtents(rangeOf(doc, entries, line.end.end - 1, line.end.end))
+      ).at(-1);
+    return !!head && !!tail && tail.right - head.left <= line.width + 0.5;
+  });
 };
 
 const STYLE_ID = 'readest-kp-style';
@@ -519,11 +484,17 @@ const STYLES = `
     hanging-punctuation: none !important;
   }
   :root .${KP_PARAGRAPH_CLASS}.${KP_PARAGRAPH_CLASS} {
+    white-space: nowrap !important;
     text-align-last: auto !important;
     hanging-punctuation: none !important;
   }
+  .${KP_BREAK_CLASS}::after {
+    content: '\\200B';
+    white-space: normal;
+  }
   .${KP_HYPHEN_CLASS}::after {
-    content: '-';
+    content: '-\\200B';
+    white-space: normal;
   }
 `;
 
@@ -535,19 +506,10 @@ const ensureStyles = (doc: Document) => {
   doc.head.append(style);
 };
 
-/**
- * Set every eligible justified paragraph of `doc` with Knuth–Plass breaks,
- * replacing any earlier run. Reads and writes the layout in batches: one
- * measuring pass over all paragraphs, one pass inserting the breaks, one pass
- * correcting the spacing.
- */
-export const applyKnuthPlass = (
-  doc: Document,
-  { lang = '', hyphenators = new Map<string, Hyphenator | null>() } = {},
-) => {
-  clearKnuthPlass(doc);
-  ensureStyles(doc);
-  const paragraphs = findParagraphs(doc, lang, hyphenators);
+// Set `paragraphs`, reading and writing the layout in bulk: one measuring
+// pass over them all, one pass inserting the breaks, one checking them, so
+// each batch costs a few layouts rather than a few per paragraph.
+const setParagraphs = (paragraphs: Paragraph[], hyphenators: Map<string, Hyphenator | null>) => {
   if (paragraphs.length === 0) return;
 
   // Measure at natural spacing with no engine hyphenation.
@@ -569,27 +531,71 @@ export const applyKnuthPlass = (
     }
   });
 
-  const fixes = set.map(correctParagraph);
-  const heights = set.map(({ el }) => blockHeight(el));
-  fixes.forEach((fix) => fix?.());
-  // Safety net: a correction that still made a line wrap adds a line.
-  set.forEach(({ el }, i) => {
-    if (fixes[i] && Math.abs(blockHeight(el) - heights[i]!) > 1) revertParagraph(el);
-  });
+  set.filter((paragraph) => !fitsMeasure(paragraph)).forEach(({ el }) => revertParagraph(el));
 };
 
-// Height of a block across all the columns it is fragmented into.
-const blockHeight = (el: HTMLElement): number =>
-  [...el.getClientRects()].reduce((sum, rect) => sum + rect.height, 0);
+/**
+ * Set every eligible paragraph of `doc` with Knuth–Plass breaks at once,
+ * replacing any earlier run. The reader goes through manageKnuthPlass, which
+ * does the same in batches without blocking the page.
+ */
+export const applyKnuthPlass = (
+  doc: Document,
+  { lang = '', hyphenators = new Map<string, Hyphenator | null>() } = {},
+) => {
+  clearKnuthPlass(doc);
+  ensureStyles(doc);
+  setParagraphs(findParagraphs(doc, lang, hyphenators), hyphenators);
+};
 
-const layoutSignature = (doc: Document, samples: Element[]): string => {
+// The paragraphs in the order the reader needs them: those on screen, then
+// the ones before them, nearest first (setting those shifts the page, so get
+// it over with), then the ones after. Returns how many are on screen.
+const inReadingOrder = (doc: Document, paragraphs: Paragraph[]) => {
+  const win = doc.defaultView!;
+  // The part of the section's frame the app window shows, in frame coordinates.
+  const frame = win.frameElement?.getBoundingClientRect();
+  const view = {
+    left: Math.max(0, -(frame?.left ?? 0)),
+    top: Math.max(0, -(frame?.top ?? 0)),
+    right: Math.min(
+      win.innerWidth,
+      (win.parent?.innerWidth ?? win.innerWidth) - (frame?.left ?? 0),
+    ),
+    bottom: Math.min(
+      win.innerHeight,
+      (win.parent?.innerHeight ?? win.innerHeight) - (frame?.top ?? 0),
+    ),
+  };
+  const onScreen = (el: HTMLElement) =>
+    [...el.getClientRects()].some(
+      (r) =>
+        r.right > view.left && r.left < view.right && r.bottom > view.top && r.top < view.bottom,
+    );
+  let first = paragraphs.findIndex(({ el }) => onScreen(el));
+  if (first < 0) first = 0;
+  let last = first;
+  while (last + 1 < paragraphs.length && onScreen(paragraphs[last + 1]!.el)) last++;
+  return {
+    ordered: [
+      ...paragraphs.slice(first, last + 1),
+      ...paragraphs.slice(0, first).reverse(),
+      ...paragraphs.slice(last + 1),
+    ],
+    visible: last + 1 - first,
+  };
+};
+
+// What the lines are measured against. Only properties that need no layout to
+// read, so checking costs a style recalc and not a reflow of the whole
+// section; the widths come from the ResizeObserver instead.
+const layoutSignature = (doc: Document, samples: Element[], widths: string): string => {
   const win = doc.defaultView;
   if (!win || !doc.body) return '';
   return [doc.body, ...samples]
     .map((el) => {
       const s = win.getComputedStyle(el);
       return [
-        s.width,
         fontOf(s),
         s.lineHeight,
         s.wordSpacing,
@@ -601,6 +607,7 @@ const layoutSignature = (doc: Document, samples: Element[]): string => {
         s.textTransform,
       ].join(',');
     })
+    .concat(widths)
     .join('|');
 };
 
@@ -612,15 +619,28 @@ type Controller = {
 
 const controllers = new WeakMap<Document, Controller>();
 
+// A batch runs for about this long before the page gets a turn again.
+const BATCH_MS = 8;
+// After a style change (a slider being dragged), wait this long for it to
+// settle before setting the paragraphs again.
+const RESTYLE_DELAY_MS = 150;
+
 const createController = (doc: Document, lang: string): Controller => {
   const win = doc.defaultView!;
   let signature = '';
   let samples: Element[] = [];
+  // Widths of the body and the samples, read where layout is fresh anyway.
+  const readWidths = () => [doc.body, ...samples].map((el) => el?.clientWidth).join(',');
+  let widths = readWidths();
   let frame = 0;
-  let destroyed = false;
+  let timer = 0;
+  // Bumped whenever a run in progress is superseded or the controller stops.
+  let generation = 0;
   const hyphenators = new Map<string, Hyphenator | null>();
 
   const run = async () => {
+    const current = generation;
+    const superseded = () => current !== generation;
     // Hyphenation patterns load once per language in the section.
     const langs = new Set(
       [...doc.querySelectorAll<HTMLElement>('[lang], html')].map((el) =>
@@ -634,27 +654,62 @@ const createController = (doc: Document, lang: string): Controller => {
         .map(async (l) => hyphenators.set(l, await loadHyphenator(l))),
     );
     await doc.fonts?.ready;
-    if (destroyed) return;
-    applyKnuthPlass(doc, { lang: controller.lang, hyphenators });
+    if (superseded()) return;
+    ensureStyles(doc);
+    const { ordered, visible } = inReadingOrder(
+      doc,
+      findParagraphs(doc, controller.lang, hyphenators),
+    );
+    // What is on screen goes first and in one piece; the rest in batches
+    // sized to BATCH_MS, yielding to the page in between.
+    let size = Math.max(visible, 1);
+    for (let i = 0; i < ordered.length; ) {
+      const started = performance.now();
+      setParagraphs(ordered.slice(i, i + size), hyphenators);
+      i += size;
+      const elapsed = Math.max(performance.now() - started, 1);
+      size = Math.max(1, Math.round((size * BATCH_MS) / elapsed));
+      // The app's timer, not the section frame's: engines throttle timers in
+      // frames that are off screen, as preloaded sections are.
+      await new Promise((resolve) => setTimeout(resolve));
+      if (superseded()) return;
+    }
+    samples.forEach((el) => resizeObserver.unobserve(el));
     samples = [...doc.querySelectorAll(`.${KP_PARAGRAPH_CLASS}`)].slice(0, 3);
-    signature = layoutSignature(doc, samples);
+    samples.forEach((el) => resizeObserver.observe(el));
+    widths = readWidths();
+    signature = layoutSignature(doc, samples, widths);
   };
 
   // Our own insertions resize the body too; only a change in what the lines
   // are measured against (width, font, spacing) warrants setting them again.
+  // Breaks set for the old layout no longer fit, so they go right away; the
+  // new ones follow once the change settles.
   const check = () => {
+    if (frame) win.cancelAnimationFrame(frame);
     frame = 0;
-    if (destroyed) return;
-    if (layoutSignature(doc, samples) !== signature) void run();
+    const next = layoutSignature(doc, samples, widths);
+    if (next === signature) return;
+    const first = signature === '';
+    signature = next;
+    generation++;
+    clearKnuthPlass(doc);
+    win.clearTimeout(timer);
+    timer = win.setTimeout(run, first ? 0 : RESTYLE_DELAY_MS);
   };
   const schedule = () => {
-    if (!frame && !destroyed) frame = win.requestAnimationFrame(check);
+    if (!frame) frame = win.requestAnimationFrame(check);
   };
 
-  const resizeObserver = new win.ResizeObserver(schedule);
+  const resizeObserver = new win.ResizeObserver(() => {
+    widths = readWidths();
+    schedule();
+  });
   resizeObserver.observe(doc.documentElement);
   if (doc.body) resizeObserver.observe(doc.body);
-  const mutationObserver = new win.MutationObserver(schedule);
+  // A stylesheet change is checked right away, before the engine lays out the
+  // old breaks under the new style only for them to be cleared.
+  const mutationObserver = new win.MutationObserver(check);
   if (doc.head) {
     mutationObserver.observe(doc.head, { childList: true, subtree: true, characterData: true });
   }
@@ -667,7 +722,8 @@ const createController = (doc: Document, lang: string): Controller => {
       schedule();
     },
     destroy: () => {
-      destroyed = true;
+      generation++;
+      win.clearTimeout(timer);
       if (frame) win.cancelAnimationFrame(frame);
       resizeObserver.disconnect();
       mutationObserver.disconnect();
