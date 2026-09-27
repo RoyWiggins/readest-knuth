@@ -1,3 +1,7 @@
+### Fork information 
+
+An experimental personal fork, with a Claude-implemented Knuth-Plass linebreaking algorithm. 
+
 <div align="center">
   <a href="https://readest.com?utm_source=github&utm_medium=referral&utm_campaign=readme" target="_blank">
     <img src="https://github.com/readest/readest/blob/main/apps/readest-app/src-tauri/icons/icon.png?raw=true" alt="Readest Logo" width="20%" />
