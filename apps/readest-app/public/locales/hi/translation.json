@@ -2460,5 +2460,7 @@
   "Dialogue Highlighting": "संवाद हाइलाइटिंग",
   "Background": "पृष्ठभूमि",
   "Follows the theme color": "थीम रंग का अनुसरण करता है",
-  "Background Style": "पृष्ठभूमि शैली"
+  "Background Style": "पृष्ठभूमि शैली",
+  "Optimal Line Breaking": "इष्टतम पंक्ति विभाजन",
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "समान अंतराल और अधिक सहज दायें किनारे के लिए TeX की तरह पूरे अनुच्छेद को एक साथ पंक्तियों में तोड़ें"
 }

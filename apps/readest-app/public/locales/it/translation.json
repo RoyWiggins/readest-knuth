@@ -2520,5 +2520,7 @@
   "Dialogue Highlighting": "Evidenziazione dialoghi",
   "Background": "Sfondo",
   "Follows the theme color": "Segue il colore del tema",
-  "Background Style": "Stile sfondo"
+  "Background Style": "Stile sfondo",
+  "Optimal Line Breaking": "Interruzione di riga ottimale",
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "Spezza interi paragrafi in una volta, come TeX, per una spaziatura uniforme e un margine destro più regolare"
 }

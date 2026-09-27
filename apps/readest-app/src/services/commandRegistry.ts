@@ -285,6 +285,12 @@ const layoutPanelItems = [
     section: 'Paragraph',
   },
   {
+    id: 'settings.layout.knuthPlass',
+    labelKey: _('Optimal Line Breaking'),
+    keywords: ['knuth', 'plass', 'tex', 'line', 'break', 'justify', 'spacing', 'rivers'],
+    section: 'Paragraph',
+  },
+  {
     id: 'settings.layout.pageMargins',
     labelKey: _('Page Margins'),
     keywords: ['page', 'margin', 'edge', 'border'],

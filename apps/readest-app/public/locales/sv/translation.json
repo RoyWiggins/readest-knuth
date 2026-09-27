@@ -2460,5 +2460,7 @@
   "Dialogue Highlighting": "Dialogmarkering",
   "Background": "Bakgrund",
   "Follows the theme color": "Följer temafärgen",
-  "Background Style": "Bakgrundsstil"
+  "Background Style": "Bakgrundsstil",
+  "Optimal Line Breaking": "Optimal radbrytning",
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "Bryt hela stycken på en gång, som TeX, för jämna ordmellanrum och en lugnare högerkant"
 }

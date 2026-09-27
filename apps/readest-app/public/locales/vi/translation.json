@@ -2400,5 +2400,7 @@
   "Dialogue Highlighting": "Đánh dấu hội thoại",
   "Background": "Nền",
   "Follows the theme color": "Theo màu chủ đề",
-  "Background Style": "Kiểu nền"
+  "Background Style": "Kiểu nền",
+  "Optimal Line Breaking": "Ngắt dòng tối ưu",
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "Ngắt dòng cả đoạn văn cùng lúc, như TeX, để khoảng cách đều và lề phải mượt hơn"
 }

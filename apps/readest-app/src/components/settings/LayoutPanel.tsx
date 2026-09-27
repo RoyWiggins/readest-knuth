@@ -15,6 +15,7 @@ import { getStyles } from '@/utils/style';
 import { getMaxInlineSize } from '@/utils/config';
 import { lockScreenOrientation } from '@/utils/bridge';
 import { saveViewSettings } from '@/helpers/settings';
+import { manageKnuthPlass } from '@/utils/knuthPlassLayout';
 import { getBookDirFromWritingMode, getBookLangCode } from '@/utils/book';
 import { MIGHT_BE_RTL_LANGS } from '@/services/constants';
 import { isHexColor } from '@/app/reader/utils/headerFooterStyle';
@@ -50,6 +51,7 @@ const LayoutPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRese
   const [textIndent, setTextIndent] = useState(viewSettings.textIndent!);
   const [fullJustification, setFullJustification] = useState(viewSettings.fullJustification);
   const [hyphenation, setHyphenation] = useState(viewSettings.hyphenation);
+  const [knuthPlass, setKnuthPlass] = useState(viewSettings.knuthPlass);
   const [marginTopPx, setMarginTopPx] = useState(viewSettings.marginPx || viewSettings.marginTopPx);
   const [marginBottomPx, setMarginBottomPx] = useState(viewSettings.marginBottomPx);
   const [marginLeftPx, setMarginLeftPx] = useState(viewSettings.marginLeftPx);
@@ -127,6 +129,7 @@ const LayoutPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRese
       textIndent: setTextIndent,
       fullJustification: setFullJustification,
       hyphenation: setHyphenation,
+      knuthPlass: setKnuthPlass,
       marginTopPx: setMarginTopPx,
       marginBottomPx: setMarginBottomPx,
       marginLeftPx: setMarginLeftPx,
@@ -199,6 +202,28 @@ const LayoutPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRese
     saveViewSettings(envConfig, bookKey, 'hyphenation', hyphenation);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hyphenation]);
+
+  useEffect(() => {
+    if (knuthPlass === viewSettings.knuthPlass) return;
+    // Like other settings, a global save reaches every open book; set or clear
+    // the rendered sections of each once they all hold the new value.
+    saveViewSettings(envConfig, bookKey, 'knuthPlass', knuthPlass).then(() => {
+      const { bookKeys, getView, getViewSettings } = useReaderStore.getState();
+      const isGlobal = getViewSettings(bookKey)?.isGlobal ?? true;
+      const keys = isGlobal ? bookKeys : bookKey ? [bookKey] : [];
+      keys.forEach((key) => {
+        const vs = getViewSettings(key);
+        const book = useBookDataStore.getState().getBookData(key)?.book;
+        getView(key)
+          ?.renderer.getContents()
+          .forEach(({ doc, index }) => {
+            const cacheKey = book?.hash && index !== undefined ? `${book.hash}:${index}` : '';
+            manageKnuthPlass(doc, !!vs?.knuthPlass, book?.primaryLanguage, cacheKey);
+          });
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [knuthPlass]);
 
   useEffect(() => {
     if (marginTopPx === viewSettings.marginTopPx) return;
@@ -671,6 +696,15 @@ const LayoutPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRese
           disabled={useBookLayout}
           onChange={() => setHyphenation(!hyphenation)}
           data-setting-id='settings.layout.hyphenation'
+        />
+        <SettingsSwitchRow
+          label={_('Optimal Line Breaking')}
+          description={_(
+            'Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge',
+          )}
+          checked={knuthPlass}
+          onChange={() => setKnuthPlass(!knuthPlass)}
+          data-setting-id='settings.layout.knuthPlass'
         />
       </BoxedList>
 

@@ -382,6 +382,7 @@ export const DEFAULT_BOOK_STYLE: BookStyle = {
   textIndent: 0,
   fullJustification: true,
   hyphenation: true,
+  knuthPlass: false,
   theme: 'light',
   backgroundTextureId: 'none',
   backgroundOpacity: 0.6,

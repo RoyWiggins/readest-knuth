@@ -2460,5 +2460,7 @@
   "Dialogue Highlighting": "Dialogni belgilash",
   "Background": "Fon",
   "Follows the theme color": "Mavzu rangidan foydalanadi",
-  "Background Style": "Fon uslubi"
+  "Background Style": "Fon uslubi",
+  "Optimal Line Breaking": "Optimal qator ajratish",
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "Butun xatboshilarni TeX kabi birdaniga qatorlarga ajratish, bir tekis oraliqlar va silliqroq oʻng chekka uchun"
 }

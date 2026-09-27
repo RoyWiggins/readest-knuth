@@ -2400,5 +2400,7 @@
   "Dialogue Highlighting": "Penyorotan Dialog",
   "Background": "Latar Belakang",
   "Follows the theme color": "Mengikuti warna tema",
-  "Background Style": "Gaya Latar Belakang"
+  "Background Style": "Gaya Latar Belakang",
+  "Optimal Line Breaking": "Pemenggalan baris optimal",
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "Memenggal seluruh paragraf sekaligus, seperti TeX, untuk spasi merata dan tepi kanan yang lebih rapi"
 }

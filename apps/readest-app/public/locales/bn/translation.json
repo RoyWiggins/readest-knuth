@@ -2460,5 +2460,7 @@
   "Dialogue Highlighting": "সংলাপ হাইলাইটিং",
   "Background": "ব্যাকগ্রাউন্ড",
   "Follows the theme color": "থিম রঙ অনুসরণ করে",
-  "Background Style": "ব্যাকগ্রাউন্ড শৈলী"
+  "Background Style": "ব্যাকগ্রাউন্ড শৈলী",
+  "Optimal Line Breaking": "সর্বোত্তম লাইন বিভাজন",
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "আরও সমান ব্যবধান ও মসৃণ ডান প্রান্তের জন্য TeX-এর মতো পুরো অনুচ্ছেদ একসাথে বিবেচনা করে লাইন ভাঙুন"
 }

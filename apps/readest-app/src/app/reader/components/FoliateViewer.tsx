@@ -84,6 +84,7 @@ import { useBookCoverAutoSave } from '../hooks/useAutoSaveBookCover';
 import { useDiscordPresence } from '@/hooks/useDiscordPresence';
 import { manageSyntaxHighlighting } from '@/utils/highlightjs';
 import { isDialogueHighlightActive, manageDialogueHighlight } from '@/utils/dialogueHighlight';
+import { manageKnuthPlass } from '@/utils/knuthPlassLayout';
 import { getViewInsets } from '@/utils/insets';
 import { collectDocumentImages, DocumentImage } from '../utils/documentImages';
 import { footerReservesBand } from '../utils/footerBand';
@@ -450,6 +451,12 @@ const FoliateViewer: React.FC<{
 
       if (isDialogueHighlightActive(viewSettings)) {
         manageDialogueHighlight(detail.doc, viewSettings);
+      }
+
+      if (viewSettings.knuthPlass && bookDoc.rendition?.layout !== 'pre-paginated') {
+        const book = bookData.book;
+        const cacheKey = book?.hash ? `${book.hash}:${detail.index}` : '';
+        manageKnuthPlass(detail.doc, true, book?.primaryLanguage, cacheKey);
       }
 
       setTimeout(() => {

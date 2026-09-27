@@ -1,0 +1,280 @@
+import { afterEach, describe, expect, it } from 'vitest';
+import * as CFI from 'foliate-js/epubcfi.js';
+import {
+  applyKnuthPlass,
+  clearKnuthPlass,
+  KP_BREAK_CLASS,
+  KP_HYPHEN_CLASS,
+  KP_PARAGRAPH_CLASS,
+  manageKnuthPlass,
+} from '@/utils/knuthPlassLayout';
+import { loadHyphenator } from '@/utils/hyphenator';
+import { loadLayouts, saveLayouts } from '@/utils/knuthPlassCache';
+
+const TEXT =
+  'In olden times when wishing still helped one, there lived a king whose daughters ' +
+  'were all beautiful; and the youngest was so beautiful that the sun itself, which ' +
+  'has seen so much, was astonished whenever it shone in her face. Close by the ' +
+  "king's castle lay a great dark forest, and under an old lime-tree in the forest " +
+  'was a well, and when the day was very warm, the king’s child went out into the ' +
+  'forest and sat down by the side of the cool fountain; and when she was bored she ' +
+  'took a golden ball, and threw it up on high and caught it; and this ball was her ' +
+  'favorite plaything.';
+
+const STYLE = `
+  body { margin: 0; font: 18px/1.5 serif; }
+  p { width: 280px; margin: 0 0 1em; text-align: justify; text-indent: 1.5em; hyphens: auto; }
+`;
+
+let iframe: HTMLIFrameElement | null = null;
+
+const MARKERS = `.${KP_BREAK_CLASS}, .${KP_HYPHEN_CLASS}`;
+
+const makeDoc = async (body: string): Promise<Document> => {
+  iframe = document.createElement('iframe');
+  iframe.style.cssText = 'width: 600px; height: 800px; border: 0';
+  document.body.append(iframe);
+  const doc = iframe.contentDocument!;
+  doc.open();
+  doc.write(
+    `<!doctype html><html lang="en"><head><style>${STYLE}</style></head><body>${body}</body></html>`,
+  );
+  doc.close();
+  await doc.fonts.ready;
+  return doc;
+};
+
+afterEach(() => {
+  iframe?.remove();
+  iframe = null;
+});
+
+// Rendered lines of an element: [left, right] of the text on each line box.
+const renderedLines = (el: HTMLElement) => {
+  const range = el.ownerDocument.createRange();
+  range.selectNodeContents(el);
+  const lines: { top: number; left: number; right: number }[] = [];
+  for (const rect of range.getClientRects()) {
+    if (rect.width === 0) continue;
+    const line = lines.find((l) => Math.abs(l.top - rect.top) < rect.height / 2);
+    if (line) {
+      line.left = Math.min(line.left, rect.left);
+      line.right = Math.max(line.right, rect.right);
+    } else lines.push({ top: rect.top, left: rect.left, right: rect.right });
+  }
+  return lines.sort((a, b) => a.top - b.top);
+};
+
+describe('applyKnuthPlass', () => {
+  it('sets a justified paragraph flush on both sides with forced breaks', async () => {
+    const doc = await makeDoc(`<p>${TEXT}</p>`);
+    const p = doc.querySelector('p')!;
+    applyKnuthPlass(doc, { lang: 'en' });
+
+    expect(p.classList.contains(KP_PARAGRAPH_CLASS)).toBe(true);
+    const breaks = p.querySelectorAll(MARKERS);
+    expect(breaks.length).toBeGreaterThan(3);
+
+    const lines = renderedLines(p);
+    // One line per forced break, plus the last line.
+    expect(lines.length).toBe(breaks.length + 1);
+    const contentRight = p.getBoundingClientRect().right;
+    for (const line of lines.slice(0, -1)) {
+      expect(Math.abs(contentRight - line.right)).toBeLessThan(0.75);
+    }
+    // The last line keeps its natural width.
+    expect(lines.at(-1)!.right).toBeLessThan(contentRight - 1);
+  });
+
+  it('keeps the text, CFIs and a live range untouched', async () => {
+    const doc = await makeDoc(
+      `<p>${TEXT} <em>An emphasized tail that runs on for a while.</em></p>`,
+    );
+    const p = doc.querySelector('p')!;
+    const textBefore = p.textContent;
+    const htmlBefore = p.innerHTML;
+    const em = p.querySelector('em')!.firstChild as Text;
+    const range = doc.createRange();
+    range.setStart(p.firstChild!, 200);
+    range.setEnd(em, 10);
+    const cfiBefore = CFI.fromRange(range);
+    const selected = range.toString();
+
+    applyKnuthPlass(doc, { lang: 'en' });
+    expect(p.querySelectorAll(MARKERS).length).toBeGreaterThan(3);
+    expect(p.textContent).toBe(textBefore);
+    // Copying the paragraph gives its text back: no line breaks, no markers.
+    const selection = doc.getSelection()!;
+    selection.selectAllChildren(p);
+    expect(selection.toString()).toBe(textBefore);
+    selection.removeAllRanges();
+    expect(range.toString()).toBe(selected);
+    expect(CFI.fromRange(range)).toBe(cfiBefore);
+    expect(CFI.toRange(doc, CFI.parse(cfiBefore)).toString()).toBe(selected);
+
+    clearKnuthPlass(doc);
+    expect(p.innerHTML).toBe(htmlBefore);
+    expect(range.toString()).toBe(selected);
+  });
+
+  it('hyphenates with dictionary patterns and draws the hyphen', async () => {
+    const hyphenator = await loadHyphenator('en');
+    expect(hyphenator).not.toBeNull();
+    const doc = await makeDoc(
+      `<p style="width: 180px">${TEXT} Notwithstanding extraordinarily incomprehensible circumstances.</p>`,
+    );
+    const p = doc.querySelector('p')!;
+    applyKnuthPlass(doc, { lang: 'en', hyphenators: new Map([['en', hyphenator]]) });
+    const hyphens = p.querySelectorAll(`.${KP_HYPHEN_CLASS}`);
+    expect(hyphens.length).toBeGreaterThan(0);
+    expect(doc.defaultView!.getComputedStyle(hyphens[0]!, '::after').content).toBe('"-\u200B"');
+    // Every hyphen sits at a line end.
+    const contentRight = p.getBoundingClientRect().right;
+    hyphens.forEach((hyphen) =>
+      expect(Math.abs(contentRight - hyphen.getBoundingClientRect().right)).toBeLessThan(0.75),
+    );
+  });
+
+  it('sets left-aligned paragraphs ragged right, with natural spaces and an even rag', async () => {
+    const doc = await makeDoc(`<p style="text-align: left">${TEXT}</p>`);
+    const p = doc.querySelector('p')!;
+    const textBefore = p.textContent;
+    const contentRight = p.getBoundingClientRect().right;
+    // Sum of squared white space at line ends, the last line excepted.
+    const raggedness = () =>
+      renderedLines(p)
+        .slice(0, -1)
+        .reduce((sum, line) => sum + (contentRight - line.right) ** 2, 0);
+    const firstFit = raggedness();
+
+    applyKnuthPlass(doc, { lang: 'en' });
+    expect(p.classList.contains(KP_PARAGRAPH_CLASS)).toBe(true);
+    const breaks = p.querySelectorAll(MARKERS).length;
+    const lines = renderedLines(p);
+    expect(lines.length).toBe(breaks + 1);
+    for (const line of lines) expect(line.right).toBeLessThanOrEqual(contentRight + 0.5);
+    expect(raggedness()).toBeLessThanOrEqual(firstFit);
+    expect(p.textContent).toBe(textBefore);
+  });
+
+  it('leaves centered, verse and single-line paragraphs alone', async () => {
+    const doc = await makeDoc(
+      `<p style="text-align: center">${TEXT}</p><p>Line one<br>line two</p><p>Short.</p>`,
+    );
+    applyKnuthPlass(doc, { lang: 'en' });
+    expect(doc.querySelectorAll(MARKERS).length).toBe(0);
+  });
+
+  it('sets the paragraphs again when the width changes', async () => {
+    const doc = await makeDoc(`<p>${TEXT}</p>`);
+    const p = doc.querySelector('p')!;
+    manageKnuthPlass(doc, true, 'en');
+    await expect.poll(() => p.classList.contains(KP_PARAGRAPH_CLASS)).toBe(true);
+    const before = p.querySelectorAll(MARKERS).length;
+    doc.head.insertAdjacentHTML('beforeend', '<style>p { width: 420px !important }</style>');
+    await expect
+      .poll(() => {
+        const count = p.querySelectorAll(MARKERS).length;
+        return count > 0 && count < before;
+      })
+      .toBe(true);
+    const contentRight = p.getBoundingClientRect().right;
+    for (const line of renderedLines(p).slice(0, -1)) {
+      expect(Math.abs(contentRight - line.right)).toBeLessThan(0.75);
+    }
+    manageKnuthPlass(doc, false);
+    expect(doc.querySelectorAll(`.${KP_PARAGRAPH_CLASS}`).length).toBe(0);
+  });
+
+  it('sets a long section in batches, the paragraphs on screen first', async () => {
+    const doc = await makeDoc(Array.from({ length: 300 }, () => `<p>${TEXT}</p>`).join(''));
+    const paragraphs = [...doc.querySelectorAll('p')];
+    const onScreen = paragraphs[150]!;
+    onScreen.scrollIntoView();
+    const setCount = () => doc.querySelectorAll(`.${KP_PARAGRAPH_CLASS}`).length;
+
+    manageKnuthPlass(doc, true, 'en');
+    await expect.poll(() => onScreen.classList.contains(KP_PARAGRAPH_CLASS)).toBe(true);
+    // The page was not blocked until the whole section was done.
+    expect(setCount()).toBeLessThan(paragraphs.length);
+    await expect.poll(setCount, { timeout: 20000 }).toBe(paragraphs.length);
+    manageKnuthPlass(doc, false);
+  });
+
+  it('clears at once on a style change and sets the paragraphs again once it settles', async () => {
+    const doc = await makeDoc(`<p>${TEXT}</p>`);
+    const p = doc.querySelector('p')!;
+    manageKnuthPlass(doc, true, 'en');
+    await expect.poll(() => p.classList.contains(KP_PARAGRAPH_CLASS)).toBe(true);
+    doc.head.insertAdjacentHTML('beforeend', '<style>p { word-spacing: 2px !important }</style>');
+    // Breaks set for the old spacing would no longer fit: gone within a frame.
+    await expect.poll(() => p.classList.contains(KP_PARAGRAPH_CLASS), { interval: 5 }).toBe(false);
+    await expect.poll(() => p.classList.contains(KP_PARAGRAPH_CLASS)).toBe(true);
+    manageKnuthPlass(doc, false);
+  });
+
+  it('sets a paragraph from its cached breaks without measuring it again', async () => {
+    const layouts = new Map<string, number[]>();
+    const first = await makeDoc(`<p>${TEXT}</p>`);
+    applyKnuthPlass(first, { lang: 'en', layouts });
+    expect(layouts.size).toBe(1);
+    const [fingerprint, markers] = [...layouts][0]!;
+    expect(markers.length).toBeGreaterThan(3);
+
+    // Keep only every other break: a set of breaks the algorithm would never
+    // pick, so seeing it proves the cache was used as is.
+    const cached = markers.filter((_, i) => i % 2 === 0);
+    layouts.set(fingerprint, cached);
+    iframe?.remove();
+    const again = await makeDoc(`<p>${TEXT}</p>`);
+    applyKnuthPlass(again, { lang: 'en', layouts });
+    const p = again.querySelector('p')!;
+    // Lines with half the breaks are too long to fit, so the check reverts
+    // them and remembers to leave the paragraph alone.
+    expect(p.querySelectorAll(MARKERS).length).toBe(0);
+    expect(layouts.get(fingerprint)).toEqual([]);
+
+    // A cached "leave alone" is honored too.
+    iframe?.remove();
+    const third = await makeDoc(`<p>${TEXT}</p>`);
+    applyKnuthPlass(third, { lang: 'en', layouts });
+    expect(third.querySelectorAll(MARKERS).length).toBe(0);
+  });
+
+  it('uses cached breaks that still fit', async () => {
+    const layouts = new Map<string, number[]>();
+    applyKnuthPlass(await makeDoc(`<p>${TEXT}</p>`), { lang: 'en', layouts });
+    const [fingerprint, markers] = [...layouts][0]!;
+    // One break more, just after the first: short lines always fit.
+    const extra = [...markers, markers[0]! + 8].sort((a, b) => a - b);
+    layouts.set(fingerprint, extra);
+    iframe?.remove();
+    const doc = await makeDoc(`<p>${TEXT}</p>`);
+    applyKnuthPlass(doc, { lang: 'en', layouts });
+    expect(doc.querySelectorAll(MARKERS).length).toBe(extra.length);
+  });
+
+  it('keys the cache by the layout: a new width is set afresh', async () => {
+    const layouts = new Map<string, number[]>();
+    applyKnuthPlass(await makeDoc(`<p>${TEXT}</p>`), { lang: 'en', layouts });
+    iframe?.remove();
+    applyKnuthPlass(await makeDoc(`<p style="width: 400px">${TEXT}</p>`), { lang: 'en', layouts });
+    expect(layouts.size).toBe(2);
+  });
+
+  it('saves and loads a section’s layouts', async () => {
+    const key = `test:${Math.random()}`;
+    await saveLayouts(
+      key,
+      new Map([
+        ['abc', [10, 21]],
+        ['def', []],
+      ]),
+    );
+    expect([...(await loadLayouts(key))]).toEqual([
+      ['abc', [10, 21]],
+      ['def', []],
+    ]);
+    expect((await loadLayouts('missing')).size).toBe(0);
+  });
+});

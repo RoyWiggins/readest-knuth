@@ -2460,5 +2460,7 @@
   "Dialogue Highlighting": "Dialoogmarkering",
   "Background": "Achtergrond",
   "Follows the theme color": "Volgt de themakleur",
-  "Background Style": "Achtergrondstijl"
+  "Background Style": "Achtergrondstijl",
+  "Optimal Line Breaking": "Optimale regelafbreking",
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "Hele alinea’s in één keer afbreken, zoals TeX, voor gelijkmatige woordafstanden en een rustigere rechterrand"
 }

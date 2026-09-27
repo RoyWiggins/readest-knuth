@@ -2460,5 +2460,7 @@
   "Dialogue Highlighting": "Επισήμανση διαλόγου",
   "Background": "Φόντο",
   "Follows the theme color": "Ακολουθεί το χρώμα του θέματος",
-  "Background Style": "Στυλ φόντου"
+  "Background Style": "Στυλ φόντου",
+  "Optimal Line Breaking": "Βέλτιστη αλλαγή γραμμής",
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "Αλλαγή γραμμών σε ολόκληρες παραγράφους μαζί, όπως στο TeX, για ομοιόμορφα διαστήματα και πιο ομαλό δεξί περιθώριο"
 }

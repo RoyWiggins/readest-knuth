@@ -284,6 +284,7 @@ export interface BookStyle {
   textIndent: number;
   fullJustification: boolean;
   hyphenation: boolean;
+  knuthPlass: boolean;
   theme: string;
   backgroundTextureId: string;
   backgroundOpacity: number;
