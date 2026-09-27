@@ -2582,5 +2582,5 @@
   "Follows the theme color": "Следует цвету темы",
   "Background Style": "Стиль фона",
   "Optimal Line Breaking": "Оптимальный перенос строк",
-  "Break justified paragraphs as a whole, like TeX, for more even spacing": "Разбивать выровненные по ширине абзацы на строки целиком, как TeX, для более равномерных интервалов"
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "Разбивать абзацы на строки целиком, как TeX, для равномерных интервалов и более ровного правого края"
 }

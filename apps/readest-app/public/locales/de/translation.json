@@ -2462,5 +2462,5 @@
   "Follows the theme color": "Folgt der Themenfarbe",
   "Background Style": "Hintergrundstil",
   "Optimal Line Breaking": "Optimaler Zeilenumbruch",
-  "Break justified paragraphs as a whole, like TeX, for more even spacing": "Blocksatz-Absätze wie TeX als Ganzes umbrechen, für gleichmäßigere Abstände"
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "Ganze Absätze auf einmal umbrechen, wie TeX, für gleichmäßige Abstände und einen ruhigeren rechten Rand"
 }

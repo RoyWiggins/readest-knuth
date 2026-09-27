@@ -2522,5 +2522,5 @@
   "Follows the theme color": "Sigue el color del tema",
   "Background Style": "Estilo de fondo",
   "Optimal Line Breaking": "Corte de línea óptimo",
-  "Break justified paragraphs as a whole, like TeX, for more even spacing": "Dividir los párrafos justificados en conjunto, como TeX, para un espaciado más uniforme"
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "Dividir párrafos enteros de una vez, como TeX, para un espaciado uniforme y un margen derecho más suave"
 }

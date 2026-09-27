@@ -1,23 +1,34 @@
 /**
- * Knuth–Plass line breaking for justified book paragraphs.
+ * Knuth–Plass line breaking for book paragraphs.
  *
  * Browsers break lines first-fit, one line at a time, which is what leaves
- * rivers of wide gaps in justified text on narrow screens. This measures each
- * justified paragraph, picks all of its breaks at once with the Knuth–Plass
- * algorithm (knuthPlass.ts), and makes the engine lay the paragraph out that
- * way:
+ * rivers of wide gaps in justified text on narrow screens, and a jagged edge
+ * with stray short lines in left-aligned text. This measures each paragraph,
+ * picks all of its breaks at once with the Knuth–Plass algorithm
+ * (knuthPlass.ts), and makes the engine lay the paragraph out that way:
  *
  * - a `<br>` at each chosen break, so the engine cannot pick another one;
- * - an empty inline spacer before every inter-word space whose horizontal
- *   margin stretches or shrinks that space to the line's adjustment ratio
- *   (lines ending in a forced break are not justified by the engine);
+ * - in justified paragraphs, an empty inline spacer before every inter-word
+ *   space whose horizontal margin stretches or shrinks that space to the
+ *   line's adjustment ratio (lines ending in a forced break are not justified
+ *   by the engine); left-aligned paragraphs keep their natural spaces and are
+ *   set for an even rag instead;
  * - an empty span whose `::after` draws the hyphen at a hyphenated break.
  *
  * Every inserted element is `cfi-inert` and holds no text, and text nodes are
  * only ever split in place (never moved), so CFIs, live ranges (reading
  * position, annotations) and text extraction see the book's own text.
  */
-import { breakLines, KPBreak, KPItem, paragraphEnd, KP_INFINITY } from './knuthPlass';
+import {
+  breakLines,
+  KPBreak,
+  KPGlue,
+  KPItem,
+  KPPenalty,
+  paragraphEnd,
+  raggedBreak,
+  KP_INFINITY,
+} from './knuthPlass';
 import { Hyphenator, loadHyphenator } from './hyphenator';
 
 export const KP_PARAGRAPH_CLASS = 'readest-kp';
@@ -28,7 +39,7 @@ export const KP_HYPHEN_CLASS = 'readest-kp-hyphen';
 
 const INSERTED_SELECTOR = `.${KP_BREAK_CLASS}, .${KP_GAP_CLASS}, .${KP_HYPHEN_CLASS}`;
 
-// Text blocks that may be justified. A div counts only when it holds nothing
+// Text blocks that may be set. A div counts only when it holds nothing
 // but inline content, which the eligibility check below enforces.
 const CANDIDATE_SELECTOR = 'p, li, dd, blockquote, div';
 
@@ -57,19 +68,25 @@ const SAFETY_PX = 0.25;
 // Breaks are chosen against a measure this much narrower, leaving room for
 // measuring error that the correction pass then takes back out.
 const SLACK_PX = 1;
+// White space a left-aligned line may leave at its end before it counts as
+// fully loose (TeX's \raggedright uses 2em; a narrow page needs a little more).
+const RAGGED_STRETCH_EM = 3;
 
 type TextEntry = { node: Text; start: number; end: number };
 
 type Glue = Extract<KPItem, { type: 'glue' }> & { start: number; end: number };
 type Penalty = Extract<KPItem, { type: 'penalty' }> & { offset: number; hyphen: boolean };
 type Box = Extract<KPItem, { type: 'box' }> & { start: number; end: number };
-type Item = Box | Glue | Penalty;
+// Plain glue and penalties are the ragged-right encoding's own (raggedBreak).
+type Item = Box | Glue | Penalty | KPGlue | KPPenalty;
 
 type Paragraph = {
   el: HTMLElement;
   text: string;
   entries: TextEntry[];
   hyphenate: boolean;
+  // Left-aligned: breaks only, spaces keep their natural width.
+  ragged: boolean;
   lang: string;
   width: number;
   indent: number;
@@ -176,7 +193,9 @@ const isEligible = (el: HTMLElement, lang: string): boolean => {
   if (!/\S\s+\S/.test(el.textContent ?? '')) return false;
   const win = el.ownerDocument.defaultView!;
   const style = win.getComputedStyle(el);
-  if (style.textAlign !== 'justify' || style.textAlignLast === 'justify') return false;
+  if (!/^(justify|left|start)$/.test(style.textAlign) || style.textAlignLast === 'justify') {
+    return false;
+  }
   if (style.direction !== 'ltr' || style.writingMode !== 'horizontal-tb') return false;
   if (style.whiteSpace !== 'normal') return false;
   if (style.display !== 'block' && style.display !== 'list-item') return false;
@@ -219,6 +238,7 @@ const findParagraphs = (
       entries,
       lang,
       hyphenate: style.hyphens === 'auto' && !!hyphenators.get(lang),
+      ragged: style.textAlign !== 'justify',
       width: contentWidth - SAFETY_PX,
       indent: px(style.textIndent, contentWidth),
       hyphenWidth: measureHyphen(doc, style),
@@ -347,8 +367,30 @@ const itemize = (
     pending.glue.shrink = glueWidth / 5;
   }
 
-  return [...items, ...(paragraphEnd() as Item[])];
+  const body = paragraph.ragged
+    ? toRagged(items, RAGGED_STRETCH_EM * parseFloat(style.fontSize))
+    : items;
+  return [...body, ...(paragraphEnd() as Item[])];
 };
+
+// Every space and hyphenation point becomes a line end that may take up to
+// `stretch` of white space, while the spaces themselves keep their width.
+const toRagged = (items: Item[], stretch: number): Item[] =>
+  items.flatMap((item): Item[] => {
+    if (item.type === 'glue' && 'end' in item) {
+      const space: Penalty = {
+        type: 'penalty',
+        width: 0,
+        penalty: 0,
+        flagged: false,
+        offset: item.end,
+        hyphen: false,
+      };
+      return raggedBreak(space, stretch, item.width);
+    }
+    if (item.type === 'penalty') return raggedBreak(item, stretch);
+    return [item];
+  });
 
 const makeElement = (doc: Document, tag: string, className: string): HTMLElement => {
   const el = doc.createElement(tag);
@@ -387,7 +429,8 @@ const applyBreaks = (paragraph: Paragraph, items: Item[], breaks: KPBreak[]): Se
       const item = items[i]!;
       if (item.type === 'box') lastBox = item;
       // The last line keeps its natural spacing unless it had to shrink.
-      if (item.type !== 'glue' || item.stretch >= KP_INFINITY || (isLast && ratio >= 0)) continue;
+      if (paragraph.ragged || item.type !== 'glue' || !('start' in item)) continue;
+      if (item.stretch >= KP_INFINITY || (isLast && ratio >= 0)) continue;
       const gap = makeElement(doc, 'span', KP_GAP_CLASS);
       setGap(gap, ratio * (ratio < 0 ? item.shrink : item.stretch));
       gaps.push(gap);
@@ -397,7 +440,7 @@ const applyBreaks = (paragraph: Paragraph, items: Item[], breaks: KPBreak[]): Se
     if (!isLast) {
       const item = items[position]!;
       const br = makeElement(doc, 'br', KP_BREAK_CLASS);
-      if (item.type === 'glue') {
+      if (item.type === 'glue' && 'end' in item) {
         insertions.push({ offset: item.end, nodes: [br], order: 1 });
       } else if (item.type === 'penalty' && 'hyphen' in item) {
         const nodes: Node[] = [br];

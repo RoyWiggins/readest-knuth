@@ -2462,5 +2462,5 @@
   "Follows the theme color": "Volgt de themakleur",
   "Background Style": "Achtergrondstijl",
   "Optimal Line Breaking": "Optimale regelafbreking",
-  "Break justified paragraphs as a whole, like TeX, for more even spacing": "Uitgevulde alinea’s als geheel afbreken, zoals TeX, voor gelijkmatigere woordafstanden"
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "Hele alinea’s in één keer afbreken, zoals TeX, voor gelijkmatige woordafstanden en een rustigere rechterrand"
 }

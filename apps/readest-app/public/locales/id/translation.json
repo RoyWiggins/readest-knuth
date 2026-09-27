@@ -2402,5 +2402,5 @@
   "Follows the theme color": "Mengikuti warna tema",
   "Background Style": "Gaya Latar Belakang",
   "Optimal Line Breaking": "Pemenggalan baris optimal",
-  "Break justified paragraphs as a whole, like TeX, for more even spacing": "Memenggal paragraf rata kiri-kanan secara keseluruhan, seperti TeX, untuk spasi yang lebih merata"
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "Memenggal seluruh paragraf sekaligus, seperti TeX, untuk spasi merata dan tepi kanan yang lebih rapi"
 }

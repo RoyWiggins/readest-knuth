@@ -2462,5 +2462,5 @@
   "Follows the theme color": "தீம் நிறத்தைப் பின்பற்றுகிறது",
   "Background Style": "பின்னணி பாணி",
   "Optimal Line Breaking": "உகந்த வரி முறிப்பு",
-  "Break justified paragraphs as a whole, like TeX, for more even spacing": "மேலும் சீரான இடைவெளிக்காக TeX போல முழு பத்தியையும் கருத்தில் கொண்டு வரிகளை முறிக்கவும்"
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "சீரான இடைவெளி மற்றும் மென்மையான வலது விளிம்பிற்காக TeX போல முழு பத்தியையும் ஒரே நேரத்தில் கருத்தில் கொண்டு வரிகளை முறிக்கவும்"
 }

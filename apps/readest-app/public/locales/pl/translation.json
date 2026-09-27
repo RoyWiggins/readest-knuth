@@ -2582,5 +2582,5 @@
   "Follows the theme color": "Używa koloru motywu",
   "Background Style": "Styl tła",
   "Optimal Line Breaking": "Optymalne łamanie wierszy",
-  "Break justified paragraphs as a whole, like TeX, for more even spacing": "Łam wyjustowane akapity w całości, jak TeX, dla bardziej równomiernych odstępów"
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "Łam całe akapity naraz, jak TeX, dla równych odstępów i gładszej prawej krawędzi"
 }

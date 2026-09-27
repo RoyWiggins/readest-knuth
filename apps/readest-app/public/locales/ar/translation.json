@@ -2702,5 +2702,5 @@
   "Follows the theme color": "يتبع لون السمة",
   "Background Style": "نمط الخلفية",
   "Optimal Line Breaking": "تقسيم الأسطر الأمثل",
-  "Break justified paragraphs as a whole, like TeX, for more even spacing": "تقسيم الفقرات المضبوطة ككل، على طريقة TeX، لتباعد أكثر انتظامًا"
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "تقسيم الفقرات كاملةً دفعة واحدة، على طريقة TeX، لتباعد منتظم وحافة يمنى أكثر انسيابًا"
 }

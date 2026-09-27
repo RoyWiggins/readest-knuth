@@ -2462,5 +2462,5 @@
   "Follows the theme color": "მიჰყვება თემის ფერს",
   "Background Style": "ფონის სტილი",
   "Optimal Line Breaking": "ხაზების ოპტიმალური გადატანა",
-  "Break justified paragraphs as a whole, like TeX, for more even spacing": "გასწორებული აბზაცების ხაზებად დაყოფა მთლიანად, TeX-ის მსგავსად, უფრო თანაბარი დაშორებისთვის"
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "მთლიანი აბზაცების ხაზებად დაყოფა ერთბაშად, TeX-ის მსგავსად, თანაბარი დაშორებისა და უფრო გლუვი მარჯვენა კიდისთვის"
 }

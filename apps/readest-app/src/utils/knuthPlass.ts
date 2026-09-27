@@ -76,6 +76,26 @@ export const paragraphEnd = (): KPItem[] => [
 ];
 
 /**
+ * A breakpoint for ragged-right setting, the encoding of Knuth & Plass: a line
+ * ending at `penalty` gets `stretch` of white space at its end, while a line
+ * running through it gets `space` (the interword space the break replaces, 0
+ * inside a word) and no stretch at all, since the two glues cancel out. Spaces
+ * thus keep their natural width and only the rag varies, which the demerits
+ * then keep even. The leading infinite penalty keeps the engine from breaking
+ * at the first glue, where the line would get no stretch.
+ */
+export const raggedBreak = <P extends KPPenalty>(
+  penalty: P,
+  stretch: number,
+  space = 0,
+): (KPGlue | KPPenalty | P)[] => [
+  { type: 'penalty', width: 0, penalty: KP_INFINITY, flagged: false },
+  { type: 'glue', width: 0, stretch, shrink: 0 },
+  penalty,
+  { type: 'glue', width: space, stretch: -stretch, shrink: 0 },
+];
+
+/**
  * Choose optimal breakpoints for `items` set in lines of `lineWidth`. Returns
  * the breaks in order (the last one is the paragraph's final forced break), or
  * null when no set of lines fits within `options.tolerance`.

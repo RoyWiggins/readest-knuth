@@ -2402,5 +2402,5 @@
   "Follows the theme color": "བརྗོད་བྱའི་ཚོན་མདོག་ལ་རྗེས་སུ་འབྲང་།",
   "Background Style": "གནས་སྟངས་ཀྱི་རྣམ་པ།",
   "Optimal Line Breaking": "ཐིག་ཕྲེང་བཅད་ཐབས་ཡག་ཤོས།",
-  "Break justified paragraphs as a whole, like TeX, for more even spacing": "བར་ཐག་སྙོམས་པའི་ཆེད་དུ་ TeX ལྟར་དུམ་མཚམས་ཧྲིལ་པོར་ཐིག་ཕྲེང་བཅད།"
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "བར་ཐག་སྙོམས་པ་དང་གཡས་མཐའ་སྙོམས་པའི་ཆེད་དུ་ TeX ལྟར་དུམ་མཚམས་ཧྲིལ་པོ་ཐེངས་གཅིག་ལ་ཐིག་ཕྲེང་བཅད།"
 }

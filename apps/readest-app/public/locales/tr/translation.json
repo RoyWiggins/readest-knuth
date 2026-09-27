@@ -2462,5 +2462,5 @@
   "Follows the theme color": "Tema rengini kullanır",
   "Background Style": "Arka Plan Stili",
   "Optimal Line Breaking": "En iyi satır bölme",
-  "Break justified paragraphs as a whole, like TeX, for more even spacing": "Daha düzgün aralıklar için iki yana yaslı paragrafları TeX gibi bir bütün olarak satırlara böl"
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "Düzgün aralıklar ve daha düzenli bir sağ kenar için paragrafları TeX gibi bir bütün olarak tek seferde satırlara böl"
 }

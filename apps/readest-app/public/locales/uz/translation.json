@@ -2462,5 +2462,5 @@
   "Follows the theme color": "Mavzu rangidan foydalanadi",
   "Background Style": "Fon uslubi",
   "Optimal Line Breaking": "Optimal qator ajratish",
-  "Break justified paragraphs as a whole, like TeX, for more even spacing": "Tekislangan xatboshilarni TeX kabi yaxlit holda qatorlarga ajratish, bir tekis oraliqlar uchun"
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "Butun xatboshilarni TeX kabi birdaniga qatorlarga ajratish, bir tekis oraliqlar va silliqroq oʻng chekka uchun"
 }

@@ -2522,5 +2522,5 @@
   "Follows the theme color": "Segue a cor do tema",
   "Background Style": "Estilo de Fundo",
   "Optimal Line Breaking": "Quebra de linha ótima",
-  "Break justified paragraphs as a whole, like TeX, for more even spacing": "Quebrar parágrafos justificados como um todo, como o TeX, para um espaçamento mais uniforme"
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "Quebrar parágrafos inteiros de uma só vez, como o TeX, para um espaçamento uniforme e uma margem direita mais suave"
 }

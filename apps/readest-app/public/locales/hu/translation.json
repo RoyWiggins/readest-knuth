@@ -2462,5 +2462,5 @@
   "Follows the theme color": "Követi a téma színét",
   "Background Style": "Háttérstílus",
   "Optimal Line Breaking": "Optimális sortörés",
-  "Break justified paragraphs as a whole, like TeX, for more even spacing": "A sorkizárt bekezdések egészben, a TeX-hez hasonlóan törve az egyenletesebb térközökért"
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "Teljes bekezdések tördelése egyszerre, a TeX-hez hasonlóan, egyenletes térközökért és simább jobb szélért"
 }

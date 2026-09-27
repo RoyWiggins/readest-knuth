@@ -2462,5 +2462,5 @@
   "Follows the theme color": "තේමා වර්ණය අනුගමනය කරයි",
   "Background Style": "පසුබිම් විලාසය",
   "Optimal Line Breaking": "ප්‍රශස්ත පේළි බිඳීම",
-  "Break justified paragraphs as a whole, like TeX, for more even spacing": "වඩා ඒකාකාර පරතරයක් සඳහා TeX මෙන් පෙළගැස්වූ ඡේද සම්පූර්ණයෙන්ම සලකා පේළි බිඳින්න"
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "ඒකාකාර පරතරයක් සහ සුමට දකුණු දාරයක් සඳහා TeX මෙන් සම්පූර්ණ ඡේද එකවර සලකා පේළි බිඳින්න"
 }

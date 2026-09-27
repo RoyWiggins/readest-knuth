@@ -2462,5 +2462,5 @@
   "Follows the theme color": "از رنگ تم پیروی می‌کند",
   "Background Style": "سبک پس‌زمینه",
   "Optimal Line Breaking": "شکست بهینه خطوط",
-  "Break justified paragraphs as a whole, like TeX, for more even spacing": "شکستن خطوط پاراگراف‌های تراز‌شده به‌صورت یکجا، مانند TeX، برای فاصله‌گذاری یکنواخت‌تر"
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "شکستن خطوط کل پاراگراف به‌صورت یکجا، مانند TeX، برای فاصله‌گذاری یکنواخت و لبهٔ راست هموارتر"
 }

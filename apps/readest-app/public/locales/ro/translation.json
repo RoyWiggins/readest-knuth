@@ -2522,5 +2522,5 @@
   "Follows the theme color": "Urmează culoarea temei",
   "Background Style": "Stil fundal",
   "Optimal Line Breaking": "Despărțire optimă a rândurilor",
-  "Break justified paragraphs as a whole, like TeX, for more even spacing": "Împarte paragrafele aliniate stânga-dreapta în ansamblu, ca TeX, pentru spațiere mai uniformă"
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "Împarte paragrafe întregi deodată, ca TeX, pentru spațiere uniformă și o margine dreaptă mai netedă"
 }

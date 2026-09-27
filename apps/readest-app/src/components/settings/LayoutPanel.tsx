@@ -696,7 +696,9 @@ const LayoutPanel: React.FC<SettingsPanelPanelProp> = ({ bookKey, onRegisterRese
         />
         <SettingsSwitchRow
           label={_('Optimal Line Breaking')}
-          description={_('Break justified paragraphs as a whole, like TeX, for more even spacing')}
+          description={_(
+            'Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge',
+          )}
           checked={knuthPlass}
           onChange={() => setKnuthPlass(!knuthPlass)}
           data-setting-id='settings.layout.knuthPlass'

@@ -2462,5 +2462,5 @@
   "Follows the theme color": "Ακολουθεί το χρώμα του θέματος",
   "Background Style": "Στυλ φόντου",
   "Optimal Line Breaking": "Βέλτιστη αλλαγή γραμμής",
-  "Break justified paragraphs as a whole, like TeX, for more even spacing": "Αλλαγή γραμμών σε πλήρως στοιχισμένες παραγράφους ως σύνολο, όπως στο TeX, για πιο ομοιόμορφα διαστήματα"
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "Αλλαγή γραμμών σε ολόκληρες παραγράφους μαζί, όπως στο TeX, για ομοιόμορφα διαστήματα και πιο ομαλό δεξί περιθώριο"
 }

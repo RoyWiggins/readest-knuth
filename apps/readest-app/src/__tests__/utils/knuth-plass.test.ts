@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { breakLines, KPItem, KP_INFINITY, paragraphEnd } from '@/utils/knuthPlass';
+import { breakLines, KPItem, KP_INFINITY, paragraphEnd, raggedBreak } from '@/utils/knuthPlass';
 
 // Monospace model: every character is one unit wide, a space is one unit that
 // may stretch by half and shrink by a third (TeX's defaults for a word space).
@@ -152,5 +152,69 @@ describe('breakLines', () => {
       breaks.map((b) => b.position),
     );
     expect(widths[0]).toBeLessThanOrEqual(20 + 3);
+  });
+
+  describe('ragged right', () => {
+    // Every space becomes a possible line end with 6 units of stretch.
+    const itemizeRagged = (text: string): KPItem[] => {
+      const items: KPItem[] = [];
+      text.split(' ').forEach((word, i) => {
+        if (i > 0) {
+          items.push(
+            ...raggedBreak({ type: 'penalty', width: 0, penalty: 0, flagged: false }, 6, 1),
+          );
+        }
+        items.push({ type: 'box', width: word.length });
+      });
+      return [...items, ...paragraphEnd()];
+    };
+
+    // Natural width of each line: boxes plus the spaces that did not break.
+    const raggedLines = (breaks: { position: number }[], items: KPItem[]) => {
+      const lines: number[] = [];
+      let width = 0;
+      let next = 0;
+      items.forEach((item, i) => {
+        if (i === breaks[next]?.position) {
+          lines.push(width);
+          width = 0;
+          next++;
+        } else if (item.type !== 'penalty') {
+          width += item.width;
+        }
+      });
+      // Spaces around a break are discarded: drop a leading space width.
+      return lines.map((w, i) => (i === 0 ? w : w - 1));
+    };
+
+    it('keeps spaces at their natural width and every line within the measure', () => {
+      const items = itemizeRagged(FROG_KING);
+      const breaks = breakLines(items, 30)!;
+      expect(breaks).not.toBeNull();
+      const words = FROG_KING.split(' ');
+      const lines = raggedLines(breaks, items);
+      lines.forEach((w) => expect(w).toBeLessThanOrEqual(30));
+      // Joining the lines' words with single spaces reproduces the widths.
+      const total = lines.reduce((sum, w) => sum + w, 0);
+      expect(total).toBe(words.join(' ').length - (lines.length - 1));
+    });
+
+    it('gives a smoother right edge than first fit', () => {
+      const items = itemizeRagged(FROG_KING);
+      const breaks = breakLines(items, 30)!;
+      const optimal = raggedLines(breaks, items).slice(0, -1);
+
+      const greedy: number[] = [];
+      let line = '';
+      for (const word of FROG_KING.split(' ')) {
+        const next = line ? `${line} ${word}` : word;
+        if (next.length > 30) {
+          greedy.push(line.length);
+          line = word;
+        } else line = next;
+      }
+      const cost = (widths: number[]) => widths.reduce((sum, w) => sum + (30 - w) ** 2, 0);
+      expect(cost(optimal)).toBeLessThan(cost(greedy));
+    });
   });
 });

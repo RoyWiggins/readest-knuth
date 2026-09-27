@@ -127,9 +127,32 @@ describe('applyKnuthPlass', () => {
     );
   });
 
-  it('leaves unjustified, verse and single-line paragraphs alone', async () => {
+  it('sets left-aligned paragraphs ragged right, with natural spaces and an even rag', async () => {
+    const doc = await makeDoc(`<p style="text-align: left">${TEXT}</p>`);
+    const p = doc.querySelector('p')!;
+    const textBefore = p.textContent;
+    const contentRight = p.getBoundingClientRect().right;
+    // Sum of squared white space at line ends, the last line excepted.
+    const raggedness = () =>
+      renderedLines(p)
+        .slice(0, -1)
+        .reduce((sum, line) => sum + (contentRight - line.right) ** 2, 0);
+    const firstFit = raggedness();
+
+    applyKnuthPlass(doc, { lang: 'en' });
+    expect(p.classList.contains(KP_PARAGRAPH_CLASS)).toBe(true);
+    expect(p.querySelectorAll(`.${KP_GAP_CLASS}`).length).toBe(0);
+    const breaks = p.querySelectorAll(`.${KP_BREAK_CLASS}`).length;
+    const lines = renderedLines(p);
+    expect(lines.length).toBe(breaks + 1);
+    for (const line of lines) expect(line.right).toBeLessThanOrEqual(contentRight + 0.5);
+    expect(raggedness()).toBeLessThanOrEqual(firstFit);
+    expect(p.textContent).toBe(textBefore);
+  });
+
+  it('leaves centered, verse and single-line paragraphs alone', async () => {
     const doc = await makeDoc(
-      `<p style="text-align: left">${TEXT}</p><p>Line one<br>line two</p><p>Short.</p>`,
+      `<p style="text-align: center">${TEXT}</p><p>Line one<br>line two</p><p>Short.</p>`,
     );
     applyKnuthPlass(doc, { lang: 'en' });
     expect(doc.querySelectorAll(`.${KP_BREAK_CLASS}, .${KP_GAP_CLASS}`).length).toBe(0);

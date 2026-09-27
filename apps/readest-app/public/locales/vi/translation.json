@@ -2402,5 +2402,5 @@
   "Follows the theme color": "Theo màu chủ đề",
   "Background Style": "Kiểu nền",
   "Optimal Line Breaking": "Ngắt dòng tối ưu",
-  "Break justified paragraphs as a whole, like TeX, for more even spacing": "Ngắt dòng cả đoạn văn căn đều cùng lúc, như TeX, để khoảng cách đều hơn"
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "Ngắt dòng cả đoạn văn cùng lúc, như TeX, để khoảng cách đều và lề phải mượt hơn"
 }

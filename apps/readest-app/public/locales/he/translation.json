@@ -2522,5 +2522,5 @@
   "Follows the theme color": "עוקב אחר צבע ערכת הנושא",
   "Background Style": "סגנון רקע",
   "Optimal Line Breaking": "שבירת שורות מיטבית",
-  "Break justified paragraphs as a whole, like TeX, for more even spacing": "שבירת שורות בפסקאות מיושרות כמכלול, כמו ב-TeX, לריווח אחיד יותר"
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "שבירת שורות בפסקאות שלמות בבת אחת, כמו ב-TeX, לריווח אחיד ולשוליים ימניים חלקים יותר"
 }

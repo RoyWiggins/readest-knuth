@@ -2402,5 +2402,5 @@
   "Follows the theme color": "跟随主题颜色",
   "Background Style": "背景样式",
   "Optimal Line Breaking": "最佳断行",
-  "Break justified paragraphs as a whole, like TeX, for more even spacing": "像 TeX 一样按整段为两端对齐的段落断行，使词间距更均匀"
+  "Break whole paragraphs at once, like TeX, for even spacing and a smoother right edge": "像 TeX 一样按整段一次性断行，使间距均匀、右边缘更整齐"
 }
